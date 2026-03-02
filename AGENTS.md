@@ -17,6 +17,17 @@ Keep related code in focused classes (one class/function, one responsibility) an
 - `./gradlew clean build`: full rebuild from scratch.
 - `./gradlew tasks`: list available Gradle tasks when adding workflows.
 
+Proper compile flow (local machine):
+- Require Java 21+ (`java -version`). Java 20 or lower will fail with Fabric Loom dependency errors.
+- Prefer local Gradle cache inside repo: `GRADLE_USER_HOME=.gradle ./gradlew build`
+- If Java 21 is not installed system-wide, use a project-local OpenJDK:
+  - `mkdir -p .tooling && cd .tooling`
+  - `curl -L -o jdk21.tar.gz "https://api.adoptium.net/v3/binary/latest/21/ga/mac/aarch64/jdk/hotspot/normal/eclipse"`
+  - `tar -xzf jdk21.tar.gz`
+  - `cd ..`
+  - `JAVA_HOME="$(ls -d "$PWD"/.tooling/jdk-21*/Contents/Home | head -n 1)" PATH="$JAVA_HOME/bin:$PATH" GRADLE_USER_HOME=.gradle ./gradlew build`
+- Output JAR: `build/libs/falcraft-<version>.jar`
+
 Environment setup for API calls:
 - Create `run/.env` with `FAL_API_KEY=...` for local development.
 
