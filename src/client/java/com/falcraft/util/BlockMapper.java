@@ -22,9 +22,15 @@ public class BlockMapper {
     
     // Color palette mapping block types to their approximate RGB colors
     private static final Map<Block, Integer> BLOCK_PALETTE = new HashMap<>();
+
+    // Wool-only palette for commands that must build with wool blocks only
+    private static final Map<Block, Integer> WOOL_PALETTE = new HashMap<>();
     
     // Cache for color lookups
     private static final Map<Integer, BlockState> COLOR_CACHE = new HashMap<>();
+
+    // Cache for wool-only color lookups
+    private static final Map<Integer, BlockState> WOOL_COLOR_CACHE = new HashMap<>();
     
     static {
         // Curated palette: Clean concrete for primary colors + stone/wood for natural tones
@@ -162,7 +168,23 @@ public class BlockMapper {
         BLOCK_PALETTE.put(Blocks.MAGENTA_WOOL, 0xBD44B3);
         BLOCK_PALETTE.put(Blocks.LIGHT_BLUE_WOOL, 0x3AAFD9);
         BLOCK_PALETTE.put(Blocks.BLACK_WOOL, 0x141519);
-        
+
+        WOOL_PALETTE.put(Blocks.WHITE_WOOL, 0xE9ECEC);
+        WOOL_PALETTE.put(Blocks.LIGHT_GRAY_WOOL, 0x8E8E86);
+        WOOL_PALETTE.put(Blocks.GRAY_WOOL, 0x3E4447);
+        WOOL_PALETTE.put(Blocks.BLACK_WOOL, 0x141519);
+        WOOL_PALETTE.put(Blocks.BROWN_WOOL, 0x724728);
+        WOOL_PALETTE.put(Blocks.RED_WOOL, 0xA12722);
+        WOOL_PALETTE.put(Blocks.ORANGE_WOOL, 0xF07613);
+        WOOL_PALETTE.put(Blocks.YELLOW_WOOL, 0xF8C627);
+        WOOL_PALETTE.put(Blocks.LIME_WOOL, 0x70B919);
+        WOOL_PALETTE.put(Blocks.GREEN_WOOL, 0x546D1B);
+        WOOL_PALETTE.put(Blocks.CYAN_WOOL, 0x158991);
+        WOOL_PALETTE.put(Blocks.LIGHT_BLUE_WOOL, 0x3AAFD9);
+        WOOL_PALETTE.put(Blocks.BLUE_WOOL, 0x353A9E);
+        WOOL_PALETTE.put(Blocks.PURPLE_WOOL, 0x7B2BAD);
+        WOOL_PALETTE.put(Blocks.MAGENTA_WOOL, 0xBD44B3);
+        WOOL_PALETTE.put(Blocks.PINK_WOOL, 0xED8DAC);
     }
     
     /**
@@ -171,46 +193,66 @@ public class BlockMapper {
      * @return The closest matching block state
      */
     public static BlockState getClosestBlock(int rgb) {
-        // Check cache first
-        if (COLOR_CACHE.containsKey(rgb)) {
-            return COLOR_CACHE.get(rgb);
+        return getClosestBlockFromPalette(rgb, BLOCK_PALETTE, COLOR_CACHE);
+    }
+
+    /**
+     * Gets the closest matching wool block for an RGB color.
+     * @param rgb The color as an RGB integer (0xRRGGBB)
+     * @return The closest matching wool block state
+     */
+    public static BlockState getClosestWoolBlock(int rgb) {
+        return getClosestBlockFromPalette(rgb, WOOL_PALETTE, WOOL_COLOR_CACHE);
+    }
+
+    /**
+     * Gets the wool palette color that best matches an RGB value.
+     * @param rgb The input color
+     * @return The closest wool color from the internal wool palette
+     */
+    public static int getClosestWoolColor(int rgb) {
+        BlockState woolState = getClosestWoolBlock(rgb);
+        return getBlockColor(woolState.getBlock());
+    }
+
+    private static BlockState getClosestBlockFromPalette(int rgb, Map<Block, Integer> palette, Map<Integer, BlockState> cache) {
+        if (cache.containsKey(rgb)) {
+            return cache.get(rgb);
         }
-        
+
+        if (palette.isEmpty()) {
+            return Blocks.WHITE_WOOL.defaultBlockState();
+        }
+
         Block closestBlock = Blocks.WHITE_WOOL;
         double minDistance = Double.MAX_VALUE;
-        
+
         int r = (rgb >> 16) & 0xFF;
         int g = (rgb >> 8) & 0xFF;
         int b = rgb & 0xFF;
-        
-        // Convert to LAB for perceptually uniform color distance
         double[] labTarget = rgbToLab(r, g, b);
-        
-        // Find closest color using perceptually-weighted distance
-        for (Map.Entry<Block, Integer> entry : BLOCK_PALETTE.entrySet()) {
+
+        for (Map.Entry<Block, Integer> entry : palette.entrySet()) {
             int blockColor = entry.getValue();
             int br = (blockColor >> 16) & 0xFF;
             int bg = (blockColor >> 8) & 0xFF;
             int bb = blockColor & 0xFF;
-            
             double[] labBlock = rgbToLab(br, bg, bb);
-            
-            // CIE76 Delta-E formula (perceptually uniform color difference)
+
             double distance = Math.sqrt(
                 Math.pow(labTarget[0] - labBlock[0], 2) +
                 Math.pow(labTarget[1] - labBlock[1], 2) +
                 Math.pow(labTarget[2] - labBlock[2], 2)
             );
-            
+
             if (distance < minDistance) {
                 minDistance = distance;
                 closestBlock = entry.getKey();
             }
         }
-        
+
         BlockState blockState = closestBlock.defaultBlockState();
-        COLOR_CACHE.put(rgb, blockState);
-        
+        cache.put(rgb, blockState);
         return blockState;
     }
     
@@ -310,5 +352,6 @@ public class BlockMapper {
      */
     public static void clearCache() {
         COLOR_CACHE.clear();
+        WOOL_COLOR_CACHE.clear();
     }
 }
