@@ -23,6 +23,7 @@ public class FalAPI {
     private static final String FAL_QUEUE_SUBMIT = "https://queue.fal.run/fal-ai/nano-banana/edit";
     private static final String FAL_3D_QUEUE_SUBMIT = "https://queue.fal.run/fal-ai/meshy/v6-preview/text-to-3d";
     private static final String FAL_ZIMAGE_QUEUE_SUBMIT = "https://queue.fal.run/fal-ai/z-image/turbo";
+    private static final String FAL_NANO_BANANA_2_QUEUE_SUBMIT = "https://queue.fal.run/fal-ai/nano-banana-2";
     private static final String FAL_SAM3_QUEUE_SUBMIT = "https://queue.fal.run/fal-ai/sam-3/3d-objects";
     private static final String FAL_VLM_QUEUE_SUBMIT = "https://queue.fal.run/openrouter/router/vision";
     private static final Gson GSON = new Gson();
@@ -403,6 +404,99 @@ public class FalAPI {
     }
 
     /**
+     * Generates an image from a text prompt using Nano Banana 2.
+     * Uses a 1:1 aspect ratio to make SAM-3D segmentation more reliable.
+     *
+     * @param prompt The base prompt (will be augmented for 3D-friendly output)
+     * @return The URL of the generated image
+     * @throws IOException If network operations fail
+     * @throws InterruptedException If the thread is interrupted during polling
+     */
+    public String generateImageWithNanoBanana2(String prompt) throws IOException, InterruptedException {
+        String augmentedPrompt = prompt + " image with plain white background, view from diagonally above";
+
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("prompt", augmentedPrompt);
+        requestBody.addProperty("num_images", 1);
+        requestBody.addProperty("aspect_ratio", "1:1");
+        requestBody.addProperty("output_format", "png");
+        requestBody.addProperty("resolution", "1K");
+        requestBody.addProperty("limit_generations", true);
+
+        String requestBodyJson = GSON.toJson(requestBody);
+
+        HttpRequest submitRequest = HttpRequest.newBuilder()
+                .uri(URI.create(FAL_NANO_BANANA_2_QUEUE_SUBMIT))
+                .header("Authorization", "Key " + apiKey)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson))
+                .build();
+
+        HttpResponse<String> submitResponse = httpClient.send(submitRequest, HttpResponse.BodyHandlers.ofString());
+
+        if (submitResponse.statusCode() != 200) {
+            LOGGER.error("Nano Banana 2 queue submit error: {} - {}", submitResponse.statusCode(), submitResponse.body());
+            throw new IOException("Failed to submit Nano Banana 2 request to fal queue: " + submitResponse.statusCode());
+        }
+
+        JsonObject submitJson = GSON.fromJson(submitResponse.body(), JsonObject.class);
+        String responseUrl = submitJson.get("response_url").getAsString();
+        String statusUrl = submitJson.get("status_url").getAsString();
+
+        boolean completed = false;
+        int attempts = 0;
+        int maxAttempts = 30;
+
+        while (!completed && attempts < maxAttempts) {
+            Thread.sleep(1000);
+            attempts++;
+
+            HttpRequest statusRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(statusUrl))
+                    .header("Authorization", "Key " + apiKey)
+                    .GET()
+                    .build();
+
+            HttpResponse<String> statusResponse = httpClient.send(statusRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (statusResponse.statusCode() == 200 || statusResponse.statusCode() == 202) {
+                JsonObject statusJson = GSON.fromJson(statusResponse.body(), JsonObject.class);
+                String status = statusJson.get("status").getAsString();
+
+                if ("COMPLETED".equals(status)) {
+                    completed = true;
+                } else if ("FAILED".equals(status)) {
+                    throw new IOException("Nano Banana 2 generation failed");
+                }
+            }
+        }
+
+        if (!completed) {
+            throw new IOException("Nano Banana 2 generation timed out after " + maxAttempts + " attempts");
+        }
+
+        HttpRequest resultRequest = HttpRequest.newBuilder()
+                .uri(URI.create(responseUrl))
+                .header("Authorization", "Key " + apiKey)
+                .GET()
+                .build();
+
+        HttpResponse<String> resultResponse = httpClient.send(resultRequest, HttpResponse.BodyHandlers.ofString());
+
+        if (resultResponse.statusCode() != 200) {
+            LOGGER.error("Failed to get Nano Banana 2 result: {} - {}", resultResponse.statusCode(), resultResponse.body());
+            throw new IOException("Failed to get Nano Banana 2 result from fal");
+        }
+
+        JsonObject resultJson = GSON.fromJson(resultResponse.body(), JsonObject.class);
+        String imageUrl = resultJson.getAsJsonArray("images")
+                .get(0).getAsJsonObject()
+                .get("url").getAsString();
+
+        return imageUrl;
+    }
+
+    /**
      * Converts an image to a 3D model using SAM-3
      * @param imageUrl The URL of the source image
      * @param prompt A short description of the object (helps SAM-3 understand the subject)
@@ -626,33 +720,48 @@ public class FalAPI {
     public ModelResult generateModelFast(String prompt) throws IOException, InterruptedException {
         // Step 1: Generate 2D image with Z-Image Turbo
         String imageUrl = generateImageWithZImage(prompt);
-        
-        // Step 2: Convert image to 3D with SAM-3D
-        // If segmentation fails, use VLM to get a better description, then fall back to "figure"
+
+        return generateModelFromImageWithFallback(imageUrl, prompt);
+    }
+
+    /**
+     * Fast 3D model generation using Nano Banana 2 + SAM-3D pipeline.
+     *
+     * @param prompt The text prompt describing the desired 3D model
+     * @return ModelResult containing GLB data
+     * @throws IOException If network operations fail
+     * @throws InterruptedException If the thread is interrupted during polling
+     */
+    public ModelResult generateModelWithNanoBanana2(String prompt) throws IOException, InterruptedException {
+        String imageUrl = generateImageWithNanoBanana2(prompt);
+        return generateModelFromImageWithFallback(imageUrl, prompt);
+    }
+
+    /**
+     * Converts a generated image to a 3D model with fallback prompt strategies for SAM-3D.
+     */
+    private ModelResult generateModelFromImageWithFallback(String imageUrl, String prompt)
+            throws IOException, InterruptedException {
         ModelResult result;
         try {
             result = generate3DWithSam3(imageUrl, prompt);
         } catch (IOException e) {
-            // Check if this is a segmentation failure (no masks found)
             if (e.getMessage() != null && e.getMessage().contains("no masks")) {
                 LOGGER.warn("SAM-3D segmentation failed with original prompt, using VLM to analyze image...");
-                
-                // Try using VLM to get a better description
+
                 try {
                     String betterPrompt = describeImageForSegmentation(imageUrl, prompt);
                     LOGGER.info("Retrying SAM-3D with VLM description: '{}'", betterPrompt);
                     result = generate3DWithSam3(imageUrl, betterPrompt);
                 } catch (IOException vlmError) {
-                    // VLM failed or SAM-3D still failed - use ultimate fallback
                     LOGGER.warn("VLM approach failed, using generic 'figure' fallback...");
                     result = generate3DWithSam3(imageUrl, "figure");
                 }
             } else {
-                throw e; // Re-throw other errors
+                throw e;
             }
         }
-        
+
         return result;
     }
 }
-

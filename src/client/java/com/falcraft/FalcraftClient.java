@@ -1,6 +1,7 @@
 package com.falcraft;
 
 import com.falcraft.commands.ConfigCommand;
+import com.falcraft.commands.BananaCommand;
 import com.falcraft.commands.GenerateCommand;
 import com.falcraft.commands.RemixCommand;
 import com.falcraft.commands.StreamCommand;
@@ -28,6 +29,7 @@ public class FalcraftClient implements ClientModInitializer {
             ConfigCommand.register(dispatcher);
             // RemixCommand.register(dispatcher);  // Coming in v1.1.0
             GenerateCommand.register(dispatcher);
+            BananaCommand.register(dispatcher);
             StreamCommand.register(dispatcher);  // Streaming 3D generation
         });
         
@@ -116,4 +118,3 @@ public class FalcraftClient implements ClientModInitializer {
         LOGGER.info("Falcraft client initialized");
     }
 }
-

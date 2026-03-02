@@ -44,6 +44,19 @@ A Fabric mod for Minecraft 1.21.1 that brings 3D model generation directly into 
 
 Generation takes ~30 seconds using Z-Image + SAM-3D pipeline.
 
+### Nano Banana 2 Mode
+
+```
+/banana <size> <prompt>
+```
+
+Alias:
+```
+/fal banana <size> <prompt>
+```
+
+Uses Nano Banana 2 for text-to-image, then SAM-3D for 3D conversion.
+
 ### Stream Mode (Live Preview)
 
 Watch structures emerge from noise in real-time!
