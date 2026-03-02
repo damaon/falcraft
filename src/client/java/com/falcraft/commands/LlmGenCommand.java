@@ -12,7 +12,9 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,6 +102,16 @@ public class LlmGenCommand {
                     : falApi.generateModelFastWithImage(prompt);
             FalAPI.ModelResult modelResult = modelWithImage.modelResult();
             String sourceImageUrl = modelWithImage.imageUrl();
+            Minecraft.getInstance().execute(() -> {
+                source.sendFeedback(Component.literal("§7[fal] Generated source image URL:"));
+                source.sendFeedback(
+                        Component.literal(sourceImageUrl)
+                                .withStyle(style -> style
+                                        .withColor(ChatFormatting.AQUA)
+                                        .withUnderlined(true)
+                                        .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, sourceImageUrl)))
+                );
+            });
 
             Minecraft.getInstance().execute(() ->
                     source.sendFeedback(Component.literal("§e[fal] [2/5] Extracting embedded textures...")));

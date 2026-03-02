@@ -34,7 +34,8 @@ public class LLMBlockTexturer {
             Block wallPrimary,
             Block wallSecondary,
             Block trim,
-            Block accent
+            Block accent,
+            List<Block> palette
     ) {}
 
     private record StructureStats(
@@ -49,7 +50,7 @@ public class LLMBlockTexturer {
     ) {}
 
     /**
-     * Textures the grid using LLM-planned constrained materials and deterministic assignment rules.
+     * Textures the grid using an LLM-selected constrained palette and pure closest-color matching.
      */
     public static Voxelizer.VoxelGrid applyLlmTexturePlan(
             Voxelizer.VoxelGrid baseGrid,
@@ -71,8 +72,11 @@ public class LLMBlockTexturer {
 
         StructureStats stats = analyzeStructure(baseGrid);
         MaterialRoles roles = chooseRolesWithFallback(userPrompt, stats, baseGrid, sourceImageUrl, falApi);
-        Map<BlockPos, Integer> textured = assignMaterials(baseGrid, roles, stats);
-        smoothSurface(textured, 1);
+        List<Block> palette = new ArrayList<>(roles.palette());
+        if (palette.isEmpty()) {
+            palette = deriveFallbackPalette(baseGrid);
+        }
+        Map<BlockPos, Integer> textured = assignByClosestPaletteColor(baseGrid, palette);
 
         return new Voxelizer.VoxelGrid(textured, baseGrid.size());
     }
@@ -107,20 +111,12 @@ public class LLMBlockTexturer {
                 - Pick at most 5 blocks.
                 - Match the exact user prompt semantics (castle, house, ship, plane, etc).
                 - If an image is provided, use it as the primary visual source for material style.
-                - Keep the palette cohesive; avoid random rainbow mixes unless prompt explicitly asks for colorful output.
-                - The result should be easy to decorate later.
+                - Keep the palette cohesive.
                 Required JSON format:
                 {
-                  "palette": ["minecraft:block_id", "..."],
-                  "roles": {
-                    "foundation": "minecraft:block_id",
-                    "wall_primary": "minecraft:block_id",
-                    "wall_secondary": "minecraft:block_id",
-                    "trim": "minecraft:block_id",
-                    "accent": "minecraft:block_id"
-                  }
+                  "palette": ["minecraft:block_id", "..."]
                 }
-                If unsure, pick a neutral and coherent palette.
+                Optional: you may include "roles", but palette is the only required field.
                 """;
     }
 
@@ -179,7 +175,7 @@ public class LLMBlockTexturer {
             return null;
         }
 
-        return new MaterialRoles(foundation, wallPrimary, wallSecondary, trim, accent);
+        return new MaterialRoles(foundation, wallPrimary, wallSecondary, trim, accent, selectedPalette);
     }
 
     private static String extractJsonObject(String text) {
@@ -330,7 +326,7 @@ public class LLMBlockTexturer {
         Block foundation = darkestBlock(fallback, wallPrimary);
         Block trim = brightestBlock(fallback, wallPrimary);
         Block accent = fallback.size() > 2 ? fallback.get(2) : null;
-        return new MaterialRoles(foundation, wallPrimary, wallSecondary, trim, accent);
+        return new MaterialRoles(foundation, wallPrimary, wallSecondary, trim, accent, fallback);
     }
 
     private static StructureStats analyzeStructure(Voxelizer.VoxelGrid grid) {
@@ -400,98 +396,76 @@ public class LLMBlockTexturer {
         return String.join(", ", parts);
     }
 
-    private static Map<BlockPos, Integer> assignMaterials(
+    private static Map<BlockPos, Integer> assignByClosestPaletteColor(
             Voxelizer.VoxelGrid baseGrid,
-            MaterialRoles roles,
-            StructureStats stats
+            List<Block> palette
     ) {
         Map<BlockPos, Integer> source = baseGrid.voxels();
-        Set<BlockPos> allPositions = new HashSet<>(source.keySet());
         Map<BlockPos, Integer> out = new HashMap<>(source.size());
-        int height = Math.max(1, stats.maxY - stats.minY + 1);
+        if (palette.isEmpty()) {
+            return new HashMap<>(source);
+        }
 
         for (Map.Entry<BlockPos, Integer> entry : source.entrySet()) {
-            BlockPos pos = entry.getKey();
-            int rgb = entry.getValue();
-            int exposedFaces = countExposedFaces(pos, allPositions);
-            boolean isSurface = exposedFaces > 0;
-            double yNorm = (pos.getY() - stats.minY) / (double) height;
-            double brightness = luma(rgb);
+            int sourceRgb = entry.getValue();
+            Block bestBlock = palette.get(0);
+            double bestDistance = Double.MAX_VALUE;
 
-            Block chosen = chooseBlockForVoxel(pos, yNorm, brightness, isSurface, exposedFaces, roles);
-            out.put(pos, BlockMapper.getBlockColor(chosen));
+            for (Block candidate : palette) {
+                int candidateRgb = BlockMapper.getBlockColor(candidate);
+                double distance = colorDistanceLab(sourceRgb, candidateRgb);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestBlock = candidate;
+                }
+            }
+
+            out.put(entry.getKey(), BlockMapper.getBlockColor(bestBlock));
         }
+
         return out;
     }
 
-    private static Block chooseBlockForVoxel(
-            BlockPos pos,
-            double yNorm,
-            double brightness,
-            boolean isSurface,
-            int exposedFaces,
-            MaterialRoles roles
-    ) {
-        if (yNorm <= 0.17) {
-            return roles.foundation();
-        }
-
-        if (isSurface && yNorm >= 0.84) {
-            return roles.trim();
-        }
-
-        if (isSurface && exposedFaces >= 3 && roles.accent() != null && hashedModulo(pos, 37) == 0) {
-            return roles.accent();
-        }
-
-        if (roles.wallSecondary() != null) {
-            boolean lighterSource = brightness > 145;
-            boolean occasionalVariation = hashedModulo(pos, 11) == 0;
-            if (lighterSource || occasionalVariation) {
-                return roles.wallSecondary();
-            }
-        }
-
-        return roles.wallPrimary();
+    private static double colorDistanceLab(int rgbA, int rgbB) {
+        double[] a = rgbToLab((rgbA >> 16) & 0xFF, (rgbA >> 8) & 0xFF, rgbA & 0xFF);
+        double[] b = rgbToLab((rgbB >> 16) & 0xFF, (rgbB >> 8) & 0xFF, rgbB & 0xFF);
+        return Math.sqrt(
+                Math.pow(a[0] - b[0], 2) +
+                Math.pow(a[1] - b[1], 2) +
+                Math.pow(a[2] - b[2], 2)
+        );
     }
 
-    private static void smoothSurface(Map<BlockPos, Integer> voxels, int passes) {
-        if (voxels.isEmpty()) {
-            return;
-        }
-        Set<BlockPos> positions = voxels.keySet();
-        for (int pass = 0; pass < passes; pass++) {
-            Map<BlockPos, Integer> updates = new HashMap<>();
-            for (BlockPos pos : positions) {
-                if (countExposedFaces(pos, positions) == 0) {
-                    continue;
-                }
+    private static double[] rgbToLab(int r, int g, int b) {
+        double varR = r / 255.0;
+        double varG = g / 255.0;
+        double varB = b / 255.0;
 
-                int current = voxels.get(pos);
-                Map<Integer, Integer> counts = new HashMap<>();
-                for (BlockPos neighbor : cardinalNeighbors(pos)) {
-                    Integer color = voxels.get(neighbor);
-                    if (color != null) {
-                        counts.put(color, counts.getOrDefault(color, 0) + 1);
-                    }
-                }
+        varR = varR > 0.04045 ? Math.pow((varR + 0.055) / 1.055, 2.4) : (varR / 12.92);
+        varG = varG > 0.04045 ? Math.pow((varG + 0.055) / 1.055, 2.4) : (varG / 12.92);
+        varB = varB > 0.04045 ? Math.pow((varB + 0.055) / 1.055, 2.4) : (varB / 12.92);
 
-                int bestColor = current;
-                int bestCount = 0;
-                for (Map.Entry<Integer, Integer> count : counts.entrySet()) {
-                    if (count.getValue() > bestCount) {
-                        bestCount = count.getValue();
-                        bestColor = count.getKey();
-                    }
-                }
+        varR *= 100;
+        varG *= 100;
+        varB *= 100;
 
-                int currentCount = counts.getOrDefault(current, 0);
-                if (bestColor != current && bestCount >= 4 && currentCount <= 1) {
-                    updates.put(pos, bestColor);
-                }
-            }
-            voxels.putAll(updates);
-        }
+        double x = varR * 0.4124 + varG * 0.3576 + varB * 0.1805;
+        double y = varR * 0.2126 + varG * 0.7152 + varB * 0.0722;
+        double z = varR * 0.0193 + varG * 0.1192 + varB * 0.9505;
+
+        double varX = x / 95.047;
+        double varY = y / 100.000;
+        double varZ = z / 108.883;
+
+        varX = varX > 0.008856 ? Math.pow(varX, 1.0 / 3.0) : (7.787 * varX) + (16.0 / 116.0);
+        varY = varY > 0.008856 ? Math.pow(varY, 1.0 / 3.0) : (7.787 * varY) + (16.0 / 116.0);
+        varZ = varZ > 0.008856 ? Math.pow(varZ, 1.0 / 3.0) : (7.787 * varZ) + (16.0 / 116.0);
+
+        double l = (116 * varY) - 16;
+        double a = 500 * (varX - varY);
+        double bLab = 200 * (varY - varZ);
+
+        return new double[]{l, a, bLab};
     }
 
     private static int countExposedFaces(BlockPos pos, Set<BlockPos> allPositions) {
@@ -513,14 +487,6 @@ public class LLMBlockTexturer {
                 pos.east(),
                 pos.west()
         );
-    }
-
-    private static int hashedModulo(BlockPos pos, int modulo) {
-        int hash = 17;
-        hash = 31 * hash + pos.getX();
-        hash = 31 * hash + pos.getY();
-        hash = 31 * hash + pos.getZ();
-        return Math.floorMod(hash, modulo);
     }
 
     private static double luma(int rgb) {
