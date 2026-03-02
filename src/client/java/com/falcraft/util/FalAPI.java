@@ -14,6 +14,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
@@ -26,6 +27,7 @@ public class FalAPI {
     private static final String FAL_NANO_BANANA_2_QUEUE_SUBMIT = "https://queue.fal.run/fal-ai/nano-banana-2";
     private static final String FAL_SAM3_QUEUE_SUBMIT = "https://queue.fal.run/fal-ai/sam-3/3d-objects";
     private static final String FAL_VLM_QUEUE_SUBMIT = "https://queue.fal.run/openrouter/router/vision";
+    private static final String VLM_MODEL = "anthropic/claude-sonnet-4.6";
     private static final Gson GSON = new Gson();
     private final HttpClient httpClient;
     private final String apiKey;
@@ -34,6 +36,10 @@ public class FalAPI {
      * Result containing both the GLB model data and optional texture URL
      */
     public record ModelResult(byte[] glbData, String textureUrl) {}
+    /**
+     * Result for pipelines that need both the generated source image and the 3D model.
+     */
+    public record ModelWithImageResult(ModelResult modelResult, String imageUrl) {}
 
     public FalAPI() {
         this.httpClient = HttpClient.newHttpClient();
@@ -623,7 +629,7 @@ public class FalAPI {
         requestBody.add("image_urls", imageUrls);
         requestBody.addProperty("prompt", "What is the main subject in this image? The original request was: " + originalPrompt);
         requestBody.addProperty("system_prompt", systemPrompt);
-        requestBody.addProperty("model", "google/gemini-2.5-flash");
+        requestBody.addProperty("model", VLM_MODEL);
         
         String requestBodyJson = GSON.toJson(requestBody);
         
@@ -706,6 +712,112 @@ public class FalAPI {
     }
 
     /**
+     * Calls an LLM through fal's OpenRouter router and returns plain text output.
+     * Intended for compact planning tasks like selecting a constrained block palette.
+     *
+     * @param systemPrompt Instruction prompt
+     * @param userPrompt User/content prompt
+     * @return Model output text
+     */
+    public String generateTextWithLlm(String systemPrompt, String userPrompt) throws IOException, InterruptedException {
+        return generateTextWithLlm(systemPrompt, userPrompt, null);
+    }
+
+    /**
+     * Calls an LLM through fal's OpenRouter router and returns plain text output.
+     * Supports optional image grounding for better visual material choices.
+     *
+     * @param systemPrompt Instruction prompt
+     * @param userPrompt User/content prompt
+     * @param imageUrl Optional image URL for VLM grounding
+     * @return Model output text
+     */
+    public String generateTextWithLlm(String systemPrompt, String userPrompt, String imageUrl) throws IOException, InterruptedException {
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("prompt", userPrompt);
+        requestBody.addProperty("system_prompt", systemPrompt);
+        requestBody.addProperty("model", VLM_MODEL);
+        JsonArray imageUrls = new JsonArray();
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            imageUrls.add(imageUrl);
+        }
+        requestBody.add("image_urls", imageUrls);
+
+        String requestBodyJson = GSON.toJson(requestBody);
+
+        HttpRequest submitRequest = HttpRequest.newBuilder()
+                .uri(URI.create(FAL_VLM_QUEUE_SUBMIT))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Key " + apiKey)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson))
+                .build();
+
+        HttpResponse<String> submitResponse = httpClient.send(submitRequest, HttpResponse.BodyHandlers.ofString());
+
+        if (submitResponse.statusCode() != 200) {
+            LOGGER.error("LLM queue submit error: {} - {}", submitResponse.statusCode(), submitResponse.body());
+            throw new IOException("Failed to submit LLM request: " + submitResponse.statusCode());
+        }
+
+        JsonObject submitJson = GSON.fromJson(submitResponse.body(), JsonObject.class);
+        String responseUrl = submitJson.get("response_url").getAsString();
+        String statusUrl = submitJson.get("status_url").getAsString();
+
+        boolean completed = false;
+        int attempts = 0;
+        int maxAttempts = 30;
+
+        while (!completed && attempts < maxAttempts) {
+            Thread.sleep(1000);
+            attempts++;
+
+            HttpRequest statusRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(statusUrl))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Authorization", "Key " + apiKey)
+                    .GET()
+                    .build();
+
+            HttpResponse<String> statusResponse = httpClient.send(statusRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (statusResponse.statusCode() == 200 || statusResponse.statusCode() == 202) {
+                JsonObject statusJson = GSON.fromJson(statusResponse.body(), JsonObject.class);
+                String status = statusJson.get("status").getAsString();
+                if ("COMPLETED".equals(status)) {
+                    completed = true;
+                } else if ("FAILED".equals(status)) {
+                    throw new IOException("LLM request failed");
+                }
+            }
+        }
+
+        if (!completed) {
+            throw new IOException("LLM request timed out");
+        }
+
+        HttpRequest resultRequest = HttpRequest.newBuilder()
+                .uri(URI.create(responseUrl))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Key " + apiKey)
+                .GET()
+                .build();
+
+        HttpResponse<String> resultResponse = httpClient.send(resultRequest, HttpResponse.BodyHandlers.ofString());
+
+        if (resultResponse.statusCode() != 200) {
+            LOGGER.error("Failed to get LLM result: {} - {}", resultResponse.statusCode(), resultResponse.body());
+            throw new IOException("Failed to get LLM result");
+        }
+
+        JsonObject resultJson = GSON.fromJson(resultResponse.body(), JsonObject.class);
+        if (!resultJson.has("output")) {
+            throw new IOException("LLM result missing output field");
+        }
+        return resultJson.get("output").getAsString().trim();
+    }
+
+    /**
      * Fast 3D model generation using Z-Image Turbo + SAM-3D pipeline
      * Much faster than Meshy-6 (~30 seconds vs ~7 minutes)
      * 
@@ -718,10 +830,17 @@ public class FalAPI {
      * @throws InterruptedException If the thread is interrupted during polling
      */
     public ModelResult generateModelFast(String prompt) throws IOException, InterruptedException {
-        // Step 1: Generate 2D image with Z-Image Turbo
-        String imageUrl = generateImageWithZImage(prompt);
+        return generateModelFastWithImage(prompt).modelResult();
+    }
 
-        return generateModelFromImageWithFallback(imageUrl, prompt);
+    /**
+     * Fast 3D model generation returning both the source image URL and resulting 3D model.
+     * Useful when downstream steps want to ground decisions on the generated 2D image.
+     */
+    public ModelWithImageResult generateModelFastWithImage(String prompt) throws IOException, InterruptedException {
+        String imageUrl = generateImageWithZImage(prompt);
+        ModelResult modelResult = generateModelFromImageWithFallback(imageUrl, prompt);
+        return new ModelWithImageResult(modelResult, imageUrl);
     }
 
     /**
@@ -733,8 +852,17 @@ public class FalAPI {
      * @throws InterruptedException If the thread is interrupted during polling
      */
     public ModelResult generateModelWithNanoBanana2(String prompt) throws IOException, InterruptedException {
+        return generateModelWithNanoBanana2WithImage(prompt).modelResult();
+    }
+
+    /**
+     * Nano Banana 2 + SAM-3D returning both source image URL and resulting 3D model.
+     * Useful when downstream stages need the source image for VLM grounding.
+     */
+    public ModelWithImageResult generateModelWithNanoBanana2WithImage(String prompt) throws IOException, InterruptedException {
         String imageUrl = generateImageWithNanoBanana2(prompt);
-        return generateModelFromImageWithFallback(imageUrl, prompt);
+        ModelResult modelResult = generateModelFromImageWithFallback(imageUrl, prompt);
+        return new ModelWithImageResult(modelResult, imageUrl);
     }
 
     /**

@@ -3,6 +3,7 @@ package com.falcraft;
 import com.falcraft.commands.ConfigCommand;
 import com.falcraft.commands.BananaCommand;
 import com.falcraft.commands.GenerateCommand;
+import com.falcraft.commands.LlmGenCommand;
 import com.falcraft.commands.RemixCommand;
 import com.falcraft.commands.StreamCommand;
 import com.falcraft.render.GhostBlockRenderer;
@@ -30,6 +31,7 @@ public class FalcraftClient implements ClientModInitializer {
             // RemixCommand.register(dispatcher);  // Coming in v1.1.0
             GenerateCommand.register(dispatcher);
             BananaCommand.register(dispatcher);
+            LlmGenCommand.register(dispatcher);
             StreamCommand.register(dispatcher);  // Streaming 3D generation
         });
         

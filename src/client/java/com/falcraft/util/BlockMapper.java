@@ -1,12 +1,17 @@
 package com.falcraft.util;
 
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -267,6 +272,38 @@ public class BlockMapper {
         Integer color = BLOCK_PALETTE.get(block);
         return color != null ? color : 0x808080;
     }
+
+    /**
+     * Gets all block IDs that are supported by the internal color palette.
+     */
+    public static List<String> getPaletteBlockIds() {
+        List<String> ids = new ArrayList<>(BLOCK_PALETTE.size());
+        for (Block block : BLOCK_PALETTE.keySet()) {
+            ids.add(BuiltInRegistries.BLOCK.getKey(block).toString());
+        }
+        ids.sort(Comparator.naturalOrder());
+        return ids;
+    }
+
+    /**
+     * Resolves a block ID if and only if it exists in the curated palette.
+     * @param blockId Block ID like "minecraft:stone_bricks"
+     * @return Palette block or null if invalid/not allowed
+     */
+    public static Block resolvePaletteBlock(String blockId) {
+        if (blockId == null || blockId.isBlank()) {
+            return null;
+        }
+        ResourceLocation location = ResourceLocation.tryParse(blockId.trim());
+        if (location == null) {
+            return null;
+        }
+        Block block = BuiltInRegistries.BLOCK.get(location);
+        if (block == Blocks.AIR || !BLOCK_PALETTE.containsKey(block)) {
+            return null;
+        }
+        return block;
+    }
     
     /**
      * Clears the color cache
@@ -275,4 +312,3 @@ public class BlockMapper {
         COLOR_CACHE.clear();
     }
 }
-
