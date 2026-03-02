@@ -10,8 +10,10 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import net.minecraft.ChatFormatting;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,11 +74,33 @@ public class BananaCommand {
                         source.sendFeedback(Component.literal("§e[fal] [1/4] Generating 2D image (Nano Banana 2)...")));
 
                 FalAPI falApi = new FalAPI();
-                FalAPI.ModelResult modelResult = falApi.generateModelWithNanoBanana2(prompt);
+                FalAPI.ModelWithImageResult modelWithImage = falApi.generateModelWithNanoBanana2WithImage(prompt);
+                FalAPI.ModelResult modelResult = modelWithImage.modelResult();
+                String sourceImageUrl = modelWithImage.imageUrl();
+                String modelGlbUrl = modelResult.glbUrl();
 
                 LOGGER.info("Received GLB model ({} bytes)", modelResult.glbData().length);
-                Minecraft.getInstance().execute(() ->
-                        source.sendFeedback(Component.literal("§e[fal] [2/4] 3D model generated! Processing...")));
+                Minecraft.getInstance().execute(() -> {
+                    source.sendFeedback(Component.literal("§e[fal] [2/4] 3D model generated! Processing..."));
+                    source.sendFeedback(Component.literal("§7[fal] Generated image URL:"));
+                    source.sendFeedback(
+                            Component.literal(sourceImageUrl)
+                                    .withStyle(style -> style
+                                            .withColor(ChatFormatting.AQUA)
+                                            .withUnderlined(true)
+                                            .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, sourceImageUrl)))
+                    );
+                    if (modelGlbUrl != null && !modelGlbUrl.isBlank()) {
+                        source.sendFeedback(Component.literal("§7[fal] Generated 3D model URL (GLB):"));
+                        source.sendFeedback(
+                                Component.literal(modelGlbUrl)
+                                        .withStyle(style -> style
+                                                .withColor(ChatFormatting.GREEN)
+                                                .withUnderlined(true)
+                                                .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, modelGlbUrl)))
+                        );
+                    }
+                });
 
                 TextureSampler textureSampler = null;
                 try {

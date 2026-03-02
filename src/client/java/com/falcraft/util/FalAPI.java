@@ -33,9 +33,9 @@ public class FalAPI {
     private final String apiKey;
     
     /**
-     * Result containing both the GLB model data and optional texture URL
+     * Result containing downloaded GLB bytes, optional texture URL, and source GLB URL.
      */
-    public record ModelResult(byte[] glbData, String textureUrl) {}
+    public record ModelResult(byte[] glbData, String textureUrl, String glbUrl) {}
     /**
      * Result for pipelines that need both the generated source image and the 3D model.
      */
@@ -267,7 +267,7 @@ public class FalAPI {
         // Step 4: Download the GLB file
         byte[] glbData = downloadFile(glbUrl);
         
-        return new ModelResult(glbData, textureUrl);
+        return new ModelResult(glbData, textureUrl, glbUrl);
     }
 
     /**
@@ -599,7 +599,7 @@ public class FalAPI {
         byte[] glbData = downloadFile(glbUrl);
         
         // SAM-3 embeds textures in the GLB, no separate texture URL
-        return new ModelResult(glbData, null);
+        return new ModelResult(glbData, null, glbUrl);
     }
 
     /**
