@@ -45,4 +45,6 @@ replay_*.log
 **/.env
 .env*
 
-reference/
+reference/.tooling
+
+.tooling/
