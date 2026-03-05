@@ -2,7 +2,6 @@ package com.falcraft.cli;
 
 import com.falcraft.util.GLBParser;
 import com.falcraft.util.TextureSampler;
-import com.falcraft.util.Voxelizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,7 +9,6 @@ import javax.swing.SwingUtilities;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Standalone CLI GLB viewer.
@@ -59,14 +57,10 @@ public final class GlbViewerCli {
                 LOGGER.info("Using original mesh triangle count: {}", sourceTriangles);
             }
             final GLBParser.MeshData finalMesh = workingMesh;
-
             final TextureSampler samplerForVoxelization = textureSampler;
-            CompletableFuture<Voxelizer.VoxelGrid> voxelFuture = CompletableFuture.supplyAsync(
-                    () -> Voxelizer.voxelize(finalMesh, options.gridSize(), samplerForVoxelization)
-            );
 
             SwingUtilities.invokeLater(() -> {
-                GlbViewerFrame frame = new GlbViewerFrame(options.path(), finalMesh, voxelFuture, options.gridSize());
+                GlbViewerFrame frame = new GlbViewerFrame(options.path(), finalMesh, samplerForVoxelization, options.gridSize());
                 frame.setVisible(true);
             });
         } catch (IllegalArgumentException e) {
@@ -170,7 +164,7 @@ public final class GlbViewerCli {
         System.out.println("Controls:");
         System.out.println("  Drag mouse       Orbit camera");
         System.out.println("  Mouse wheel      Zoom");
-        System.out.println("  V                Toggle mesh <-> voxelized");
+        System.out.println("  V                Toggle mesh <-> voxelized (starts voxelization on first press)");
         System.out.println("  R                Reset camera");
         System.out.println("  Esc / Q          Close viewer");
     }

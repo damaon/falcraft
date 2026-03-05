@@ -44,6 +44,7 @@ public class GlbViewerFrame extends JFrame {
     private static final int MAX_RENDER_TRIANGLES = 25_000;
     private static final int MAX_RENDER_VOXELS = 120_000;
     private static final int CLI_PROGRESS_STEP_PERCENT = 5;
+
     private static final ExecutorService VOXEL_EXECUTOR = Executors.newSingleThreadExecutor(new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
@@ -65,8 +66,8 @@ public class GlbViewerFrame extends JFrame {
     private final JPanel panel;
     private final Timer repaintTimer;
 
-    private List<VoxelPoint> voxelPoints;
     private volatile CompletableFuture<Voxelizer.VoxelGrid> voxelFuture;
+    private List<VoxelPoint> voxelPoints;
     private volatile String voxelStatus = "Idle (press V to start voxelization)";
     private volatile int voxelProgressPercent = 0;
     private volatile int lastLoggedProgressPercent = -1;
@@ -320,7 +321,7 @@ public class GlbViewerFrame extends JFrame {
         if (voxelPoints != null) {
             voxelLabel = "voxels: " + fullVoxelCount + (voxelPoints.size() < fullVoxelCount ? " (sampled " + voxelPoints.size() + ")" : "");
         } else {
-            voxelLabel = voxelStatus;
+            voxelLabel = voxelStatus + (voxelProgressPercent > 0 ? " (" + voxelProgressPercent + "%)" : "");
         }
 
         List<String> lines = List.of(
@@ -356,22 +357,67 @@ public class GlbViewerFrame extends JFrame {
     }
 
     private void pollVoxelFuture() {
-        if (voxelPoints != null || !voxelFuture.isDone()) {
+        CompletableFuture<Voxelizer.VoxelGrid> localFuture = voxelFuture;
+        if (voxelPoints != null || localFuture == null || !localFuture.isDone()) {
             return;
         }
+
         try {
-            Voxelizer.VoxelGrid grid = voxelFuture.get();
+            Voxelizer.VoxelGrid grid = localFuture.get();
             fullVoxelCount = grid.voxels().size();
             voxelPoints = buildVoxelPoints(grid);
             voxelStatus = "Ready";
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            voxelStatus = "Voxelization interrupted";
-        } catch (CompletionException e) {
-            voxelStatus = "Voxelization failed: " + cleanErrorMessage(e.getCause());
+            voxelProgressPercent = 100;
         } catch (Exception e) {
-            voxelStatus = "Voxelization failed: " + cleanErrorMessage(e);
+            Throwable root = e.getCause() != null ? e.getCause() : e;
+            voxelStatus = "Voxelization failed: " + cleanErrorMessage(root);
+            System.out.println("[glb-viewer] Voxelization failed: " + cleanErrorMessage(root));
         }
+    }
+
+    private void startVoxelizationIfNeeded() {
+        if (voxelPoints != null || voxelFuture != null) {
+            return;
+        }
+
+        voxelStatus = "Voxelizing";
+        voxelProgressPercent = 0;
+        lastLoggedProgressPercent = -1;
+        System.out.println("[glb-viewer] Starting voxelization (" + gridSize + "^3 grid)...");
+
+        voxelFuture = CompletableFuture.supplyAsync(
+                () -> Voxelizer.voxelize(meshData, gridSize, textureSampler, this::onVoxelProgress),
+                VOXEL_EXECUTOR
+        ).whenComplete((grid, throwable) -> {
+            if (throwable != null) {
+                String message = cleanErrorMessage(throwable.getCause() != null ? throwable.getCause() : throwable);
+                voxelStatus = "Voxelization failed: " + message;
+                System.out.println("[glb-viewer] Voxelization failed: " + message);
+            } else if (grid != null) {
+                voxelStatus = "Ready";
+                voxelProgressPercent = 100;
+                System.out.println("[glb-viewer] Voxelization complete: " + grid.voxels().size() + " voxels.");
+            }
+        });
+    }
+
+    private void onVoxelProgress(int trianglesProcessed, int totalTriangles, int voxelCandidates) {
+        if (totalTriangles <= 0) {
+            return;
+        }
+
+        int percent = Math.max(0, Math.min(100, (int) Math.round((trianglesProcessed * 100.0) / totalTriangles)));
+        voxelProgressPercent = percent;
+        voxelStatus = "Voxelizing";
+
+        if (percent >= lastLoggedProgressPercent + CLI_PROGRESS_STEP_PERCENT || percent == 100) {
+            lastLoggedProgressPercent = percent;
+            System.out.println("[glb-viewer] Voxelizing " + percent + "% ("
+                    + trianglesProcessed + "/" + totalTriangles
+                    + " triangles, " + voxelCandidates + " voxel candidates)");
+        }
+
+        SwingUtilities.invokeLater(panel::repaint);
     }
 
     private List<VoxelPoint> buildVoxelPoints(Voxelizer.VoxelGrid grid) {
