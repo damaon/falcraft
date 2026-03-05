@@ -31,10 +31,14 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.lit
  * Command to generate 3D models using Nano Banana 2 + SAM-3D, then remap to wool only.
  * Usage:
  * - /woolgen <size> <prompt>
+ * - /woolgenstream <size> <prompt>
  * - /fal woolgen <size> <prompt>
+ * - /fal woolgenstream <size> <prompt>
  */
 public class WoolGenCommand {
     private static final Logger LOGGER = LoggerFactory.getLogger("WoolGenCommand");
+    private static final int STREAM_LAYERS_PER_BATCH = 1;
+    private static final int STREAM_TICKS_BETWEEN_BATCHES = 20;
 
     private static final SuggestionProvider<FabricClientCommandSource> SIZE_SUGGESTIONS = (context, builder) -> {
         builder.suggest(16, Component.literal("Tiny"));
@@ -55,22 +59,45 @@ public class WoolGenCommand {
                         .then(argument("prompt", StringArgumentType.greedyString())
                                 .executes(WoolGenCommand::execute))));
 
+        dispatcher.register(literal("woolgenstream")
+                .then(argument("size", IntegerArgumentType.integer(16, 128))
+                        .suggests(SIZE_SUGGESTIONS)
+                        .then(argument("prompt", StringArgumentType.greedyString())
+                                .executes(WoolGenCommand::executeStream))));
+
         dispatcher.register(literal("fal")
                 .then(literal("woolgen")
                         .then(argument("size", IntegerArgumentType.integer(16, 128))
                                 .suggests(SIZE_SUGGESTIONS)
                                 .then(argument("prompt", StringArgumentType.greedyString())
-                                        .executes(WoolGenCommand::execute)))));
+                                        .executes(WoolGenCommand::execute))))
+                .then(literal("woolgenstream")
+                        .then(argument("size", IntegerArgumentType.integer(16, 128))
+                                .suggests(SIZE_SUGGESTIONS)
+                                .then(argument("prompt", StringArgumentType.greedyString())
+                                        .executes(WoolGenCommand::executeStream)))));
     }
 
     private static int execute(CommandContext<FabricClientCommandSource> context) {
+        return execute(context, false);
+    }
+
+    private static int executeStream(CommandContext<FabricClientCommandSource> context) {
+        return execute(context, true);
+    }
+
+    private static int execute(CommandContext<FabricClientCommandSource> context, boolean streamPlacement) {
         int size = IntegerArgumentType.getInteger(context, "size");
         String prompt = StringArgumentType.getString(context, "prompt");
         FabricClientCommandSource source = context.getSource();
+        String commandName = streamPlacement ? "woolgenstream" : "woolgen";
 
         source.sendFeedback(Component.literal("§e[fal] Starting wool-only 3D generation (" + size + "x" + size + "x" + size + ")"));
         source.sendFeedback(Component.literal("§e[fal] Prompt: \"" + prompt + "\""));
         source.sendFeedback(Component.literal("§e[fal] Pipeline: Nano Banana 2 + SAM-3D + wool palette remap"));
+        if (streamPlacement) {
+            source.sendFeedback(Component.literal("§e[fal] Build mode: 3D-printer stream (1 layer/sec)"));
+        }
 
         new Thread(() -> {
             try {
@@ -162,12 +189,23 @@ public class WoolGenCommand {
 
                 Minecraft.getInstance().execute(() -> {
                     try {
-                        PlacementPreview.startPlacement(woolGrid);
-
-                        source.sendFeedback(Component.literal(
-                                "§a[fal] ✓ Woolgen complete! " + woolGrid.voxels().size() + " wool blocks ready."));
-                        source.sendFeedback(Component.literal(
-                                "§e[fal] Right-click to place, G to rotate!"));
+                        if (streamPlacement) {
+                            PlacementPreview.startPlacement(
+                                    woolGrid,
+                                    STREAM_LAYERS_PER_BATCH,
+                                    STREAM_TICKS_BETWEEN_BATCHES
+                            );
+                            source.sendFeedback(Component.literal(
+                                    "§a[fal] ✓ Woolgen stream complete! " + woolGrid.voxels().size() + " wool blocks ready."));
+                            source.sendFeedback(Component.literal(
+                                    "§e[fal] Right-click to start layer build (1 layer/sec), G to rotate!"));
+                        } else {
+                            PlacementPreview.startPlacement(woolGrid);
+                            source.sendFeedback(Component.literal(
+                                    "§a[fal] ✓ Woolgen complete! " + woolGrid.voxels().size() + " wool blocks ready."));
+                            source.sendFeedback(Component.literal(
+                                    "§e[fal] Right-click to place, G to rotate!"));
+                        }
                     } catch (Exception e) {
                         String errorMsg = e.getMessage();
                         source.sendError(Component.literal("§c[fal] Error preparing placement: " + errorMsg));
@@ -182,10 +220,10 @@ public class WoolGenCommand {
             } catch (Exception e) {
                 String errorMsg = e.getMessage();
                 Minecraft.getInstance().execute(() ->
-                        source.sendError(Component.literal("§c[fal] Error during woolgen: " + errorMsg)));
+                        source.sendError(Component.literal("§c[fal] Error during " + commandName + ": " + errorMsg)));
                 LOGGER.error("Error during wool-only Nano Banana 2 generation process", e);
             }
-        }, "fal-WoolGen-Thread").start();
+        }, streamPlacement ? "fal-WoolGenStream-Thread" : "fal-WoolGen-Thread").start();
 
         return 1;
     }

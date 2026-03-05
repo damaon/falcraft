@@ -57,6 +57,23 @@ Alias:
 
 Uses Nano Banana 2 for text-to-image, then SAM-3D for 3D conversion.
 
+### Wool Stream Build Mode
+
+Build with wool only, then place it like a fast 3D printer (1 layer/second).
+
+```
+/woolgenstream <size> <prompt>
+```
+
+Alias:
+```
+/fal woolgenstream <size> <prompt>
+```
+
+**Controls in preview mode:**
+- **Right-click** - Start layer-by-layer build (1 layer/second)
+- **G** - Rotate 90°
+
 ### Stream Mode (Live Preview)
 
 Watch structures emerge from noise in real-time!

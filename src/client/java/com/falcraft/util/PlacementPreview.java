@@ -54,22 +54,40 @@ public class PlacementPreview {
     private static BlockPos placementOrigin = null;
     private static int placementRotation = 0; // Rotation to apply during placement
     private static int placementGridSize = 0; // Grid size for rotation calculation
-    private static final int LAYERS_PER_TICK = 3; // Place 3 Y-levels per tick for smooth animation
+    private static final int DEFAULT_LAYERS_PER_BATCH = 3;
+    private static final int DEFAULT_TICKS_BETWEEN_BATCHES = 1;
+    private static int pendingLayersPerBatch = DEFAULT_LAYERS_PER_BATCH;
+    private static int pendingTicksBetweenBatches = DEFAULT_TICKS_BETWEEN_BATCHES;
+    private static int activeLayersPerBatch = DEFAULT_LAYERS_PER_BATCH;
+    private static int activeTicksBetweenBatches = DEFAULT_TICKS_BETWEEN_BATCHES;
+    private static int ticksUntilNextBatch = 0;
     
     /**
      * Starts placement preview mode with the given voxel grid
      * @param grid The voxel grid to preview
      */
     public static void startPlacement(Voxelizer.VoxelGrid grid) {
+        startPlacement(grid, DEFAULT_LAYERS_PER_BATCH, DEFAULT_TICKS_BETWEEN_BATCHES);
+    }
+
+    /**
+     * Starts placement preview mode with configurable placement pacing.
+     * @param grid The voxel grid to preview
+     * @param layersPerBatch How many Y-layers to place in each animation batch
+     * @param ticksBetweenBatches How many client ticks to wait between batches
+     */
+    public static void startPlacement(Voxelizer.VoxelGrid grid, int layersPerBatch, int ticksBetweenBatches) {
         pendingGrid = grid;
         isActive = true;
         isStreaming = false;
         rotationIndex = 0; // Reset rotation
+        pendingLayersPerBatch = Math.max(1, layersPerBatch);
+        pendingTicksBetweenBatches = Math.max(1, ticksBetweenBatches);
         
         // Pre-compute surface voxels for preview rendering
         surfaceVoxels = extractSurfaceVoxels(grid);
-        LOGGER.info("Started placement preview mode with {} voxels, {} surface voxels", 
-            grid.voxels().size(), surfaceVoxels.size());
+        LOGGER.info("Started placement preview mode with {} voxels, {} surface voxels (layersPerBatch={}, ticksBetweenBatches={})",
+            grid.voxels().size(), surfaceVoxels.size(), pendingLayersPerBatch, pendingTicksBetweenBatches);
     }
     
     // ==================== STREAMING MODE ====================
@@ -764,6 +782,9 @@ public class PlacementPreview {
             // Convert to list of layers (sorted by Y)
             layersByY = new ArrayList<>(voxelsByY.values());
             currentLayerIndex = 0;
+            activeLayersPerBatch = pendingLayersPerBatch;
+            activeTicksBetweenBatches = pendingTicksBetweenBatches;
+            ticksUntilNextBatch = 0;
             isAnimatingPlacement = true;
             
             // Exit preview mode (but keep animating)
@@ -771,7 +792,8 @@ public class PlacementPreview {
             pendingGrid = null;
             surfaceVoxels = null;
             
-            LOGGER.info("Prepared {} layers for animated placement", layersByY.size());
+            LOGGER.info("Prepared {} layers for animated placement (layersPerBatch={}, ticksBetweenBatches={})",
+                layersByY.size(), activeLayersPerBatch, activeTicksBetweenBatches);
         }
     }
     
@@ -927,6 +949,11 @@ public class PlacementPreview {
         if (!isAnimatingPlacement || layersByY == null) {
             return;
         }
+
+        if (ticksUntilNextBatch > 0) {
+            ticksUntilNextBatch--;
+            return;
+        }
         
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
@@ -949,7 +976,7 @@ public class PlacementPreview {
         int layersPlaced = 0;
         int blocksPlaced = 0;
         
-        while (currentLayerIndex < layersByY.size() && layersPlaced < LAYERS_PER_TICK) {
+        while (currentLayerIndex < layersByY.size() && layersPlaced < activeLayersPerBatch) {
             List<Map.Entry<BlockPos, Integer>> layer = layersByY.get(currentLayerIndex);
             
             // Place all blocks in this layer
@@ -978,10 +1005,12 @@ public class PlacementPreview {
         // Check if we're done
         if (currentLayerIndex >= layersByY.size()) {
             LOGGER.info("Animated placement complete! Placed {} blocks", getTotalBlockCount());
-            isAnimatingPlacement = false;
-            layersByY = null;
-            placementOrigin = null;
-            currentLayerIndex = 0;
+            cancelAnimatedPlacement();
+            return;
+        }
+
+        if (layersPlaced > 0) {
+            ticksUntilNextBatch = activeTicksBetweenBatches - 1;
         }
     }
     
@@ -995,6 +1024,11 @@ public class PlacementPreview {
         placementRotation = 0;
         placementGridSize = 0;
         currentLayerIndex = 0;
+        activeLayersPerBatch = DEFAULT_LAYERS_PER_BATCH;
+        activeTicksBetweenBatches = DEFAULT_TICKS_BETWEEN_BATCHES;
+        pendingLayersPerBatch = DEFAULT_LAYERS_PER_BATCH;
+        pendingTicksBetweenBatches = DEFAULT_TICKS_BETWEEN_BATCHES;
+        ticksUntilNextBatch = 0;
     }
     
     /**
@@ -1053,4 +1087,3 @@ public class PlacementPreview {
         }
     }
 }
-
