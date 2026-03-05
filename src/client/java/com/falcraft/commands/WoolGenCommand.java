@@ -3,6 +3,7 @@ package com.falcraft.commands;
 import com.falcraft.util.BlockMapper;
 import com.falcraft.util.FalAPI;
 import com.falcraft.util.GLBParser;
+import com.falcraft.util.MeshSimplifier;
 import com.falcraft.util.PlacementPreview;
 import com.falcraft.util.TextureSampler;
 import com.falcraft.util.Voxelizer;
@@ -122,11 +123,32 @@ public class WoolGenCommand {
 
                 GLBParser.MeshData meshData = GLBParser.parse(modelResult.glbData(), textureSampler);
 
+                int sourceTriangles = meshData.indices().length / 3;
+                int simplifyTargetTriangles = getSimplifyTargetTriangles(size);
+                GLBParser.MeshData voxelMesh = meshData;
+                if (sourceTriangles > simplifyTargetTriangles) {
+                    Minecraft.getInstance().execute(() ->
+                            source.sendFeedback(Component.literal("§e[fal] [4/5] Simplifying mesh for voxelization...")));
+
+                    voxelMesh = MeshSimplifier.simplify(meshData, simplifyTargetTriangles);
+                    int simplifiedTriangles = voxelMesh.indices().length / 3;
+                    LOGGER.info("Woolgen mesh simplified from {} to {} triangles (target={})",
+                            sourceTriangles, simplifiedTriangles, simplifyTargetTriangles);
+
+                    int finalSimplifiedTriangles = simplifiedTriangles;
+                    Minecraft.getInstance().execute(() ->
+                            source.sendFeedback(Component.literal("§7[fal] Mesh simplified: "
+                                    + sourceTriangles + " -> " + finalSimplifiedTriangles + " triangles")));
+                } else {
+                    LOGGER.info("Woolgen mesh simplification skipped ({} triangles <= target {})",
+                            sourceTriangles, simplifyTargetTriangles);
+                }
+
                 final TextureSampler finalTextureSampler = textureSampler;
                 Minecraft.getInstance().execute(() ->
                         source.sendFeedback(Component.literal("§e[fal] [4/5] Converting to voxels...")));
 
-                Voxelizer.VoxelGrid baseGrid = Voxelizer.voxelize(meshData, size, finalTextureSampler);
+                Voxelizer.VoxelGrid baseGrid = Voxelizer.voxelize(voxelMesh, size, finalTextureSampler);
 
                 if (baseGrid.voxels().isEmpty()) {
                     Minecraft.getInstance().execute(() ->
@@ -175,5 +197,14 @@ public class WoolGenCommand {
             woolVoxels.put(entry.getKey(), woolColor);
         }
         return new Voxelizer.VoxelGrid(woolVoxels, grid.size());
+    }
+
+    /**
+     * Mesh simplification target tuned by requested voxel grid size.
+     * Smaller grids need fewer triangles, larger grids can preserve more detail.
+     */
+    private static int getSimplifyTargetTriangles(int gridSize) {
+        int scaled = gridSize * gridSize * 20;
+        return Math.max(12_000, Math.min(80_000, scaled));
     }
 }

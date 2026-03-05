@@ -1,6 +1,4 @@
-package com.falcraft.cli;
-
-import com.falcraft.util.GLBParser;
+package com.falcraft.util;
 
 import java.util.ArrayList;
 import java.util.HashMap;

@@ -1,6 +1,7 @@
 package com.falcraft.cli;
 
 import com.falcraft.util.GLBParser;
+import com.falcraft.util.MeshSimplifier;
 import com.falcraft.util.TextureSampler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
