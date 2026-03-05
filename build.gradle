@@ -53,6 +53,15 @@ tasks.withType(JavaCompile).configureEach {
 	it.options.release = 21
 }
 
+tasks.register("runGlbViewer", JavaExec) {
+	group = "application"
+	description = "Run standalone GLB model viewer CLI"
+	classpath = sourceSets.client.runtimeClasspath
+	mainClass = "com.falcraft.cli.GlbViewerCli"
+	jvmArgs "-Djava.awt.headless=false"
+	standardInput = System.in
+}
+
 java {
 	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
 	// if it is present.

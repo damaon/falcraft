@@ -102,6 +102,7 @@ public class LlmGenCommand {
                     : falApi.generateModelFastWithImage(prompt);
             FalAPI.ModelResult modelResult = modelWithImage.modelResult();
             String sourceImageUrl = modelWithImage.imageUrl();
+            String modelGlbUrl = modelResult.glbUrl();
             Minecraft.getInstance().execute(() -> {
                 source.sendFeedback(Component.literal("§7[fal] Generated source image URL:"));
                 source.sendFeedback(
@@ -111,6 +112,16 @@ public class LlmGenCommand {
                                         .withUnderlined(true)
                                         .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, sourceImageUrl)))
                 );
+                if (modelGlbUrl != null && !modelGlbUrl.isBlank()) {
+                    source.sendFeedback(Component.literal("§7[fal] Generated 3D model URL (GLB):"));
+                    source.sendFeedback(
+                            Component.literal(modelGlbUrl)
+                                    .withStyle(style -> style
+                                            .withColor(ChatFormatting.GREEN)
+                                            .withUnderlined(true)
+                                            .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, modelGlbUrl)))
+                    );
+                }
             });
 
             Minecraft.getInstance().execute(() ->

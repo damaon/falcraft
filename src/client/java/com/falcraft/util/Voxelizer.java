@@ -35,6 +35,14 @@ public class Voxelizer {
      * Represents a voxelized 3D model
      */
     public record VoxelGrid(Map<BlockPos, Integer> voxels, int size) {}
+
+    /**
+     * Progress callback for long-running voxelization jobs.
+     */
+    @FunctionalInterface
+    public interface ProgressListener {
+        void onProgress(int trianglesProcessed, int totalTriangles, int voxelCandidates);
+    }
     
     /**
      * 2D vector for UV coordinates
@@ -521,6 +529,15 @@ public class Voxelizer {
     }
     
     public static VoxelGrid voxelize(GLBParser.MeshData mesh, int resolution, TextureSampler textureSampler) {
+        return voxelize(mesh, resolution, textureSampler, null);
+    }
+
+    public static VoxelGrid voxelize(
+            GLBParser.MeshData mesh,
+            int resolution,
+            TextureSampler textureSampler,
+            ProgressListener progressListener
+    ) {
         float[] vertices = mesh.vertices();
         int[] indices = mesh.indices();
         float[] uvs = mesh.uvs();
@@ -607,6 +624,8 @@ public class Voxelizer {
         Map<BlockPos, WeightedColor> candidates = new HashMap<>();
         int trianglesProcessed = 0;
         int voxelsUpdated = 0;
+        int totalTriangles = triangles.size();
+        int progressInterval = Math.max(1, totalTriangles / 200); // ~0.5% increments
         
         for (TexturedTriangle tri : triangles) {
             trianglesProcessed++;
@@ -672,6 +691,14 @@ public class Voxelizer {
                 }
             }
             
+            if (progressListener != null &&
+                    (trianglesProcessed == 1 || trianglesProcessed == totalTriangles || trianglesProcessed % progressInterval == 0)) {
+                try {
+                    progressListener.onProgress(trianglesProcessed, totalTriangles, candidates.size());
+                } catch (Exception ignored) {
+                    // Progress callbacks are non-critical.
+                }
+            }
         }
         
         // Extract final colors
