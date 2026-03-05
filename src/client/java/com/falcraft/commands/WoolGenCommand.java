@@ -28,7 +28,8 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.arg
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
 /**
- * Command to generate 3D models using Nano Banana 2 + SAM-3D, then remap to wool only.
+ * Command to generate 3D models using Nano Banana 2 + SAM-3D, then remap to a
+ * curated decorative block palette (wool + concrete + stone + terracotta, etc.).
  * Usage:
  * - /woolgen <size> <prompt>
  * - /woolgenstream <size> <prompt>
@@ -92,16 +93,16 @@ public class WoolGenCommand {
         FabricClientCommandSource source = context.getSource();
         String commandName = streamPlacement ? "woolgenstream" : "woolgen";
 
-        source.sendFeedback(Component.literal("§e[fal] Starting wool-only 3D generation (" + size + "x" + size + "x" + size + ")"));
+        source.sendFeedback(Component.literal("§e[fal] Starting palette-mix 3D generation (" + size + "x" + size + "x" + size + ")"));
         source.sendFeedback(Component.literal("§e[fal] Prompt: \"" + prompt + "\""));
-        source.sendFeedback(Component.literal("§e[fal] Pipeline: Nano Banana 2 + SAM-3D + wool palette remap"));
+        source.sendFeedback(Component.literal("§e[fal] Pipeline: Nano Banana 2 + SAM-3D + decorative palette remap"));
         if (streamPlacement) {
             source.sendFeedback(Component.literal("§e[fal] Build mode: 3D-printer stream (1 layer/sec)"));
         }
 
         new Thread(() -> {
             try {
-                LOGGER.info("Starting wool-only Nano Banana 2 3D generation process...");
+                LOGGER.info("Starting palette-mix Nano Banana 2 3D generation process...");
 
                 Minecraft.getInstance().execute(() ->
                         source.sendFeedback(Component.literal("§e[fal] [1/5] Generating 2D image (Nano Banana 2)...")));
@@ -184,25 +185,25 @@ public class WoolGenCommand {
                 }
 
                 Minecraft.getInstance().execute(() ->
-                        source.sendFeedback(Component.literal("§e[fal] [5/5] Remapping voxels to colored wool...")));
-                Voxelizer.VoxelGrid woolGrid = remapToWoolPalette(baseGrid);
+                        source.sendFeedback(Component.literal("§e[fal] [5/5] Remapping voxels to decorative block mix...")));
+                Voxelizer.VoxelGrid mixedGrid = remapToDecorativePalette(baseGrid);
 
                 Minecraft.getInstance().execute(() -> {
                     try {
                         if (streamPlacement) {
                             PlacementPreview.startPlacement(
-                                    woolGrid,
+                                    mixedGrid,
                                     STREAM_LAYERS_PER_BATCH,
                                     STREAM_TICKS_BETWEEN_BATCHES
                             );
                             source.sendFeedback(Component.literal(
-                                    "§a[fal] ✓ Woolgen stream complete! " + woolGrid.voxels().size() + " wool blocks ready."));
+                                    "§a[fal] ✓ Woolgen stream complete! " + mixedGrid.voxels().size() + " palette-mix blocks ready."));
                             source.sendFeedback(Component.literal(
                                     "§e[fal] Right-click to start layer build (1 layer/sec), G to rotate!"));
                         } else {
-                            PlacementPreview.startPlacement(woolGrid);
+                            PlacementPreview.startPlacement(mixedGrid);
                             source.sendFeedback(Component.literal(
-                                    "§a[fal] ✓ Woolgen complete! " + woolGrid.voxels().size() + " wool blocks ready."));
+                                    "§a[fal] ✓ Woolgen complete! " + mixedGrid.voxels().size() + " palette-mix blocks ready."));
                             source.sendFeedback(Component.literal(
                                     "§e[fal] Right-click to place, G to rotate!"));
                         }
@@ -221,20 +222,25 @@ public class WoolGenCommand {
                 String errorMsg = e.getMessage();
                 Minecraft.getInstance().execute(() ->
                         source.sendError(Component.literal("§c[fal] Error during " + commandName + ": " + errorMsg)));
-                LOGGER.error("Error during wool-only Nano Banana 2 generation process", e);
+                LOGGER.error("Error during palette-mix Nano Banana 2 generation process", e);
             }
         }, streamPlacement ? "fal-WoolGenStream-Thread" : "fal-WoolGen-Thread").start();
 
         return 1;
     }
 
-    private static Voxelizer.VoxelGrid remapToWoolPalette(Voxelizer.VoxelGrid grid) {
-        Map<BlockPos, Integer> woolVoxels = new HashMap<>(grid.voxels().size());
+    private static Voxelizer.VoxelGrid remapToDecorativePalette(Voxelizer.VoxelGrid grid) {
+        Map<BlockPos, Integer> mappedVoxels = new HashMap<>(grid.voxels().size());
+        Map<Integer, Integer> mappedColorCache = new HashMap<>();
+
         for (Map.Entry<BlockPos, Integer> entry : grid.voxels().entrySet()) {
-            int woolColor = BlockMapper.getClosestWoolColor(entry.getValue());
-            woolVoxels.put(entry.getKey(), woolColor);
+            int sourceColor = entry.getValue();
+            int mappedColor = mappedColorCache.computeIfAbsent(sourceColor, rgb -> {
+                return BlockMapper.getBlockColor(BlockMapper.getClosestBlock(rgb).getBlock());
+            });
+            mappedVoxels.put(entry.getKey(), mappedColor);
         }
-        return new Voxelizer.VoxelGrid(woolVoxels, grid.size());
+        return new Voxelizer.VoxelGrid(mappedVoxels, grid.size());
     }
 
     /**

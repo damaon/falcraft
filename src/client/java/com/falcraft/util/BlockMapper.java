@@ -87,7 +87,10 @@ public class BlockMapper {
         
         // White/light blocks with texture variety
         BLOCK_PALETTE.put(Blocks.QUARTZ_BLOCK, 0xE8E5DD); // Bright white
+        BLOCK_PALETTE.put(Blocks.SMOOTH_QUARTZ, 0xEEE9DE); // Marble-like smooth white
+        BLOCK_PALETTE.put(Blocks.QUARTZ_BRICKS, 0xE6E1D8); // Marble-like tiled white
         BLOCK_PALETTE.put(Blocks.CALCITE, 0xE3E4DC);      // Crystalline white
+        BLOCK_PALETTE.put(Blocks.POLISHED_DIORITE, 0xF3F3F0); // Marble-like polished stone
         BLOCK_PALETTE.put(Blocks.BONE_BLOCK, 0xE3DCC6);   // Cream with lines
         BLOCK_PALETTE.put(Blocks.WHITE_WOOL, 0xE9ECEC);   // Soft fabric white
         BLOCK_PALETTE.put(Blocks.MUSHROOM_STEM, 0xC9AE9D); // Pale tan with spots
@@ -130,6 +133,12 @@ public class BlockMapper {
         
         // Unique color blocks
         BLOCK_PALETTE.put(Blocks.AMETHYST_BLOCK, 0x8B6AA6);
+        BLOCK_PALETTE.put(Blocks.REDSTONE_BLOCK, 0xAA0F01);
+        BLOCK_PALETTE.put(Blocks.LAPIS_BLOCK, 0x1E4B8C);
+        BLOCK_PALETTE.put(Blocks.GOLD_BLOCK, 0xF9D71C);
+        BLOCK_PALETTE.put(Blocks.IRON_BLOCK, 0xD8D8D8);
+        BLOCK_PALETTE.put(Blocks.DIAMOND_BLOCK, 0x62E2DD);
+        BLOCK_PALETTE.put(Blocks.EMERALD_BLOCK, 0x52D869);
         BLOCK_PALETTE.put(Blocks.PRISMARINE, 0x63A293);
         BLOCK_PALETTE.put(Blocks.PRISMARINE_BRICKS, 0x5BA496);
         BLOCK_PALETTE.put(Blocks.SEA_LANTERN, 0xACDBC5);

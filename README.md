@@ -59,7 +59,7 @@ Uses Nano Banana 2 for text-to-image, then SAM-3D for 3D conversion.
 
 ### Wool Stream Build Mode
 
-Build with wool only, then place it like a fast 3D printer (1 layer/second).
+Build with a decorative block mix (wool + concrete + stone + quartz/calcite), then place it like a fast 3D printer (1 layer/second).
 
 ```
 /woolgenstream <size> <prompt>
