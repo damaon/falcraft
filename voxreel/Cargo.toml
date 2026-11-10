@@ -1,0 +1,21 @@
+[package]
+name = "voxreel"
+version = "0.1.0"
+edition = "2021"
+description = "Renders satisfying voxel build videos (9:16 shorts), incl. AI build battles via OpenRouter"
+
+[dependencies]
+anyhow = "1"
+bytemuck = { version = "1.16", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
+fontdue = "0.9"
+glam = "0.29"
+pollster = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "2", features = ["json"] }
+wgpu = "25"
+
+[profile.release]
+debug = false
+lto = "thin"

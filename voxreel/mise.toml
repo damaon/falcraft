@@ -1,0 +1,16 @@
+[tools]
+rust = "1.91"
+
+[tasks.build]
+run = "cargo build --release"
+
+[tasks.test]
+run = "cargo test --release"
+
+[tasks.demo]
+description = "Render the bundled example build (no API key needed)"
+run = "cargo run --release -- render examples/lighthouse.json -o out/lighthouse.mp4"
+
+[tasks.battle]
+description = "AI build battle: mise run battle -- \"a capybara in a hot spring\""
+run = "cargo run --release -- battle"
