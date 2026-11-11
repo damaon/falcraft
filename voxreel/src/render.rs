@@ -106,6 +106,11 @@ struct Uniforms {
     sky_top: [f32; 4],
     sky_horizon: [f32; 4],
     ground: [f32; 4],
+    ground2: [f32; 4],
+    /// time, cloud amount, star amount, unused
+    extra: [f32; 4],
+    /// output width, height
+    res: [f32; 4],
     /// fog_near, fog_far, shadow texel size, ground y
     params: [f32; 4],
 }
@@ -114,17 +119,24 @@ struct Uniforms {
 pub struct Theme {
     pub sky_top: [u8; 3],
     pub sky_horizon: [u8; 3],
+    /// Ground is a soft two-tone checker of `ground` / `ground2`.
     pub ground: [u8; 3],
+    pub ground2: [u8; 3],
     pub plate: [u8; 3],
+    pub clouds: f32,
+    pub stars: f32,
 }
 
 impl Theme {
     pub fn by_name(name: &str) -> Self {
+        let t = |sky_top, sky_horizon, ground, ground2, plate, clouds, stars| Self { sky_top, sky_horizon, ground, ground2, plate, clouds, stars };
         match name {
-            "night" => Self { sky_top: [12, 14, 40], sky_horizon: [70, 52, 110], ground: [38, 36, 58], plate: [24, 22, 36] },
-            "sunset" => Self { sky_top: [72, 92, 170], sky_horizon: [255, 170, 120], ground: [210, 170, 150], plate: [70, 50, 60] },
-            "mint" => Self { sky_top: [110, 200, 190], sky_horizon: [225, 250, 235], ground: [200, 232, 214], plate: [60, 90, 86] },
-            _ => Self { sky_top: [86, 150, 235], sky_horizon: [205, 228, 250], ground: [222, 226, 232], plate: [58, 62, 74] },
+            "candy" => t([150, 96, 235], [255, 196, 228], [255, 222, 236], [255, 204, 226], [255, 255, 255], 0.9, 0.0),
+            "sunset" => t([64, 70, 175], [255, 168, 112], [236, 190, 160], [226, 176, 148], [255, 244, 236], 0.7, 0.0),
+            "night" => t([8, 10, 38], [64, 50, 118], [44, 48, 82], [38, 42, 74], [70, 74, 110], 0.0, 1.0),
+            "moon" => t([4, 4, 16], [26, 22, 60], [150, 150, 162], [138, 138, 150], [70, 70, 86], 0.0, 1.0),
+            "mint" => t([70, 190, 200], [214, 248, 236], [196, 236, 214], [184, 228, 204], [255, 255, 255], 0.8, 0.0),
+            _ => t([36, 120, 236], [178, 222, 255], [132, 206, 102], [120, 194, 92], [250, 250, 252], 1.0, 0.0),
         }
     }
 }
@@ -144,6 +156,8 @@ pub struct View {
     pub ground_y: f32,
     /// Post-projection offset in NDC, to place the subject off-centre (e.g. leave room for a label).
     pub shift: [f32; 2],
+    /// Seconds, drives cloud drift.
+    pub time: f32,
 }
 
 impl View {
@@ -457,6 +471,9 @@ impl Renderer {
             sky_top: lin(t.sky_top),
             sky_horizon: lin(t.sky_horizon),
             ground: lin(t.ground),
+            ground2: lin(t.ground2),
+            extra: [view.time, t.clouds, t.stars, 0.0],
+            res: [self.width as f32, self.height as f32, 0.0, 0.0],
             params: [dist * 1.2, dist * 3.5, 1.0 / SHADOW_SIZE as f32, view.ground_y],
         };
         self.queue.write_buffer(&self.uniform_buf, 0, bytemuck::bytes_of(&u));

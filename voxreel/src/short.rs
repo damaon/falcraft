@@ -68,7 +68,7 @@ struct Cam {
     elevation: f32,
     shift: [f32; 2],
 }
-const BUILD_CAM: Cam = Cam { elevation: 0.42, shift: [0.0, 0.0] };
+const BUILD_CAM: Cam = Cam { elevation: 0.26, shift: [0.0, 0.0] };
 /// Lineup panels are very wide and short: look more from the side and push the build left so
 /// the model name fits on the right.
 const PANEL_CAM_LABELLED: Cam = Cam { elevation: 0.22, shift: [-0.22, 0.0] };
@@ -223,7 +223,8 @@ impl Short {
         for (i, e) in self.entries.iter().enumerate() {
             self.scene(&e.anim, 1e6, inst);
             let angle = 0.9 + lt * 0.35;
-            let view = orbit_view(&e.anim, angle, self.panel_dist[i], panel_cam(&self.entries).0);
+            let mut view = orbit_view(&e.anim, angle, self.panel_dist[i], panel_cam(&self.entries).0);
+            view.time = lt;
             panel.render(inst, &view, buf)?;
             let y0 = top + i * (ph + gap);
             for row in 0..ph {
@@ -283,6 +284,7 @@ impl Short {
             scene_radius: 10.0,
             ground_y: -0.4,
             shift: [0.0, 0.0],
+            time: 0.0,
         };
         main.render(inst, &view, buf)
     }
@@ -292,7 +294,9 @@ impl Short {
             Shot::Build { entry, start } => {
                 let lt = t - start;
                 self.scene(&self.entries[entry].anim, lt, inst);
-                main.render(inst, &self.build_view(entry, lt), buf)?;
+                let mut view = self.build_view(entry, lt);
+                view.time = t;
+                main.render(inst, &view, buf)?;
                 self.overlay_build(entry, lt, buf, text);
             }
             Shot::Lineup { start } | Shot::Teaser { start } => {
@@ -366,6 +370,7 @@ fn orbit_view(a: &BuildAnim, angle: f32, dist: f32, cam: Cam) -> View {
         scene_radius: 0.5 * (w * w + h * h + d * d).sqrt() + PLATE_MARGIN * 2.0,
         ground_y: -0.4,
         shift: cam.shift,
+        time: 0.0,
     }
 }
 

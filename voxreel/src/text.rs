@@ -5,22 +5,13 @@ use anyhow::{Context, Result};
 use fontdue::{Font, FontSettings};
 use std::collections::HashMap;
 
-const FONT_CANDIDATES: &[&str] = &[
-    "/System/Library/Fonts/Supplemental/Impact.ttf",
-    "/System/Library/Fonts/Supplemental/Arial Black.ttf",
-    "/Library/Fonts/Impact.ttf",
-    "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-];
+/// Lilita One (SIL OFL, see assets/fonts/OFL.txt): chunky and rounded, reads well for kids
+/// and at phone size. Embedded so renders look the same on every machine.
+const DEFAULT_FONT: &[u8] = include_bytes!("../assets/fonts/LilitaOne-Regular.ttf");
 
 pub fn load_font(path: Option<&str>) -> Result<Font> {
-    let path = match path {
-        Some(p) => p.to_string(),
-        None => FONT_CANDIDATES
-            .iter()
-            .find(|p| std::path::Path::new(p).exists())
-            .context("no bold system font found, pass --font <file.ttf>")?
-            .to_string(),
+    let Some(path) = path else {
+        return Font::from_bytes(DEFAULT_FONT, FontSettings::default()).map_err(|e| anyhow::anyhow!("embedded font: {e}"));
     };
     let bytes = std::fs::read(&path).with_context(|| format!("read font {path}"))?;
     Font::from_bytes(bytes, FontSettings::default()).map_err(|e| anyhow::anyhow!("font {path}: {e}"))
@@ -44,7 +35,7 @@ pub struct Style {
 
 impl Style {
     pub fn new(size: f32, fill: [u8; 3]) -> Self {
-        Self { size, fill, outline: [10, 10, 16], outline_px: (size * 0.09).max(3.0), max_width: 980.0 }
+        Self { size, fill, outline: [34, 24, 82], outline_px: (size * 0.10).max(3.0), max_width: 980.0 }
     }
 }
 
@@ -70,6 +61,8 @@ impl Sprite {
     pub fn text(font: &Font, text: &str, st: Style) -> Self {
         let lines = wrap(font, text, st.size, st.max_width);
         let pad = st.outline_px.ceil() as usize + 2;
+        // Soft drop shadow below the outline gives the "sticker" look kids' channels use.
+        let shadow_dy = (st.size * 0.07).round().max(2.0) as usize;
         let line_h = (st.size * 1.08).ceil() as usize;
         let lm = font.horizontal_line_metrics(st.size);
         let ascent = lm.map(|m| m.ascent).unwrap_or(st.size * 0.8);
@@ -78,7 +71,7 @@ impl Sprite {
             .map(|l| l.chars().map(|c| font.metrics(c, st.size).advance_width).sum())
             .collect();
         let w = widths.iter().cloned().fold(1.0, f32::max).ceil() as usize + pad * 2;
-        let h = line_h * lines.len().max(1) + pad * 2;
+        let h = line_h * lines.len().max(1) + pad * 2 + shadow_dy;
         let mut cov = vec![0f32; w * h];
         for (li, line) in lines.iter().enumerate() {
             let mut x = pad as f32 + (w as f32 - 2.0 * pad as f32 - widths[li]) * 0.5;
@@ -130,13 +123,15 @@ impl Sprite {
         }
         let f = st.fill.map(|c| c as f32 / 255.0);
         let o = st.outline.map(|c| c as f32 / 255.0);
-        let px = cov
-            .iter()
-            .zip(&outline)
-            .map(|(&c, &ol)| {
+        let px = (0..w * h)
+            .map(|i| {
+                let (c, ol) = (cov[i], outline[i]);
+                let sh = if i >= shadow_dy * w { outline[i - shadow_dy * w] * 0.45 } else { 0.0 };
                 let a = ol.max(c);
                 let rgb = [0, 1, 2].map(|k| f[k] * c + o[k] * (a - c));
-                [rgb[0], rgb[1], rgb[2], a]
+                // Shadow (black, premultiplied) only where the glyph+outline doesn't cover.
+                let a_total = a + sh * (1.0 - a);
+                [rgb[0], rgb[1], rgb[2], a_total]
             })
             .collect();
         Self { w, h, px }

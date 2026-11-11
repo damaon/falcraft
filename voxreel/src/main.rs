@@ -77,7 +77,7 @@ struct VideoArgs {
     /// Opening hook showing the finished builds (battles only); 0 disables.
     #[arg(long, default_value_t = 1.5)]
     teaser_secs: f32,
-    /// day | sunset | night | mint
+    /// day | candy | sunset | night | moon | mint
     #[arg(long, default_value = "day")]
     theme: String,
     #[arg(long)]
