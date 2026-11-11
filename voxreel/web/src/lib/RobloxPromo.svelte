@@ -2,8 +2,7 @@
 	import icon from '#lib/assets/roblox/let-it-plow-icon.jpg';
 	import ShortEmbed from './ShortEmbed.svelte';
 
-	// No locale in the URL so Roblox shows the page in each player's own language.
-	const GAME_URL = 'https://www.roblox.com/games/88385952629341/Let-it-Plow-Snow-Simulator';
+	import { ROBLOX_GAME_URL as GAME_URL } from './links';
 	const SHORT_ID = 'vKJ21e6pyTA';
 </script>
 

@@ -2,6 +2,7 @@
 	import '../app.css';
 	import logo from '#lib/assets/logo.svg';
 	import Socials from '#lib/Socials.svelte';
+	import { ROBLOX_GAME_URL } from '#lib/links.ts';
 	import { resolve } from '$app/paths';
 	import type { LayoutProps } from './$types';
 
@@ -18,7 +19,12 @@
 		<img src={logo} alt="" width="56" height="56" />
 		<span>Bananini Games</span>
 	</a>
-	<Socials compact />
+	<div class="top-links">
+		<a class="roblox" href={ROBLOX_GAME_URL} target="_blank" rel="noopener noreferrer">
+			<span aria-hidden="true">🎮</span> Play on Roblox
+		</a>
+		<Socials compact />
+	</div>
 </header>
 
 <main>
@@ -40,6 +46,40 @@
 		justify-content: space-between;
 		gap: 12px;
 		padding-block: 18px 6px;
+	}
+	.top-links {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+	.roblox {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		min-height: 48px;
+		padding: 10px 20px;
+		border-radius: 999px;
+		font: 19px/1 var(--font-display);
+		color: #fff;
+		background: #00b06f;
+		box-shadow: 0 5px 0 #007a4c;
+		text-decoration: none;
+		transition: transform 0.08s ease;
+	}
+	.roblox:hover {
+		transform: translateY(-2px);
+	}
+	.roblox:focus-visible {
+		outline: 4px solid var(--accent);
+		outline-offset: 3px;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.roblox {
+			transition: none;
+		}
+		.roblox:hover {
+			transform: none;
+		}
 	}
 	.made {
 		margin-top: 24px !important;
