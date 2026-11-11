@@ -21,10 +21,10 @@
     <!-- Eyes -->
     <circle cx="55" cy="43" r="6.5" fill="#ffffff" stroke-width="2"/>
     <circle cx="73" cy="43" r="6.5" fill="#ffffff" stroke-width="2"/>
-    <circle cx="56.5" cy="44" r="3.2" fill="#22184f" stroke="none"/>
-    <circle cx="74.5" cy="44" r="3.2" fill="#22184f" stroke="none"/>
-    <circle cx="57.6" cy="42.8" r="1.1" fill="#ffffff" stroke="none"/>
-    <circle cx="75.6" cy="42.8" r="1.1" fill="#ffffff" stroke="none"/>
+    <circle class="pupil" cx="56.5" cy="44" r="3.2" fill="#22184f" stroke="none"/>
+    <circle class="pupil" cx="74.5" cy="44" r="3.2" fill="#22184f" stroke="none"/>
+    <circle class="pupil" cx="57.6" cy="42.8" r="1.1" fill="#ffffff" stroke="none"/>
+    <circle class="pupil" cx="75.6" cy="42.8" r="1.1" fill="#ffffff" stroke="none"/>
     <path d="M47 34 Q55 30 61 34 M67 34 Q73 30 81 34" fill="none" stroke-width="2.5"/>
     <!-- Nose -->
     <ellipse cx="61" cy="53" rx="1.6" ry="1.2" fill="#22184f" stroke="none"/>

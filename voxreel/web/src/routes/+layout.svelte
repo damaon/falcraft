@@ -3,6 +3,7 @@
 	// Shared with the video renderer (voxreel/assets).
 	import logo from '../../../assets/logo.svg';
 	import Socials from '#lib/Socials.svelte';
+	import Mascot from '#lib/Mascot.svelte';
 	import { ROBLOX_GAME_URL } from '#lib/links.ts';
 	import { resolve } from '$app/paths';
 	import type { LayoutProps } from './$types';
@@ -16,10 +17,10 @@
 </svelte:head>
 
 <header class="wrap top">
-	<a class="logo" href={resolve('/')}>
-		<img src={logo} alt="" width="56" height="56" />
-		<span>Bananini Games</span>
-	</a>
+	<div class="logo">
+		<Mascot />
+		<a href={resolve('/')}>Bananini Games</a>
+	</div>
 	<div class="top-links">
 		<a class="roblox" href={ROBLOX_GAME_URL} target="_blank" rel="noopener noreferrer">
 			<span aria-hidden="true">🎮</span> Play on Roblox
@@ -93,6 +94,10 @@
 		text-decoration: none;
 		color: #fff;
 		text-shadow: 0 3px 0 rgba(34, 24, 79, 0.35);
+	}
+	.logo a {
+		color: inherit;
+		text-decoration: none;
 	}
 	.foot {
 		padding-block: 40px 32px;
