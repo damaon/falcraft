@@ -20,3 +20,13 @@ run = "cargo run --release -- battle"
 description = "Dev server for the build gallery website"
 dir = "web"
 run = "npm run dev"
+
+[tasks.export]
+description = "Minecraft downloads (Java + Bedrock) for every build into web/static/downloads"
+run = "cargo run --release -- export builds -o web/static/downloads"
+
+[tasks.deploy]
+description = "Export Minecraft downloads, build the website and deploy it to Cloudflare"
+depends = ["export"]
+dir = "web"
+run = "npm run build && npx wrangler@4 deploy"

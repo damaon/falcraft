@@ -1,5 +1,6 @@
 mod anim;
 mod audio;
+mod export;
 mod llm;
 mod render;
 mod short;
@@ -51,6 +52,14 @@ enum Cmd {
         reveal_names: bool,
         #[command(flatten)]
         video: VideoArgs,
+    },
+    /// Minecraft downloads (Java world zip + Bedrock .mcworld) for every builds/<slug>/<n>.json.
+    Export {
+        /// Folder with one sub-folder per battle.
+        #[arg(default_value = "builds")]
+        builds: PathBuf,
+        #[arg(short, long, default_value = "web/static/downloads")]
+        out: PathBuf,
     },
     /// Print the system prompt the models get (handy for testing the DSL by hand).
     Prompt {
@@ -128,6 +137,7 @@ fn main() -> Result<()> {
             let cfg = config(&video, "BUILD BATTLE", prompt.to_uppercase());
             produce(cfg, entries, &video, &dir.join("battle.mp4"))
         }
+        Cmd::Export { builds, out } => export_all(&builds, &out),
         Cmd::Prompt { grid } => {
             println!("{}", llm::system_prompt(grid));
             Ok(())
@@ -240,4 +250,37 @@ fn splitmix(mut x: u64) -> u64 {
     x = (x ^ (x >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
     x = (x ^ (x >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
     x ^ (x >> 31)
+}
+
+fn export_all(builds: &Path, out: &Path) -> Result<()> {
+    let mut count = 0;
+    let mut battles: Vec<_> = std::fs::read_dir(builds)?.filter_map(|e| e.ok()).filter(|e| e.path().is_dir()).collect();
+    battles.sort_by_key(|e| e.file_name());
+    for battle in battles {
+        let slug = battle.file_name().to_string_lossy().to_string();
+        let mut specs: Vec<_> = std::fs::read_dir(battle.path())?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|x| x == "json"))
+            .collect();
+        specs.sort();
+        let dir = out.join(&slug);
+        std::fs::create_dir_all(&dir)?;
+        for path in specs {
+            let n = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+            let spec = load_spec(&path)?;
+            let blocks = export::Blocks::from_grid(&spec.voxelize()?);
+            let title = if spec.title.is_empty() { slug.clone() } else { spec.title.clone() };
+            let world = format!("Bananini - {title}");
+            let id = format!("{slug}/{n}");
+            // Descriptive names so a kid's Downloads folder says what each file is: rocket_2.mcworld
+            let file = format!("{}_{n}", slug.replace('-', "_"));
+            std::fs::write(dir.join(format!("{file}_java.zip")), export::java_world_zip(&blocks, &world, &title)?)?;
+            std::fs::write(dir.join(format!("{file}.mcworld")), export::bedrock_mcworld(&blocks, &world, &title, &id)?)?;
+            eprintln!("  {id}: {} blocks, {:?}", blocks.blocks.len(), blocks.size.to_array());
+            count += 1;
+        }
+    }
+    eprintln!("  exported {count} builds -> {}", out.display());
+    Ok(())
 }

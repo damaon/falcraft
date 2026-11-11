@@ -3,13 +3,14 @@
 	import { battles } from '#lib/builds.ts';
 	import { buildFromSpec } from '#lib/voxels.ts';
 	import VoxelView from '#lib/VoxelView.svelte';
+	import RobloxPromo from '#lib/RobloxPromo.svelte';
 	import { DROP_SECS } from '#lib/stage.ts';
 
 	const cards = battles.map((b) => ({ ...b, voxelBuilds: b.builds.map((s) => buildFromSpec(s, 6, DROP_SECS)) }));
 </script>
 
 <svelte:head>
-	<title>Build Battle</title>
+	<title>Bananini Games: Build Battle</title>
 </svelte:head>
 
 <section class="wrap hero">
@@ -31,6 +32,8 @@
 		</a>
 	{/each}
 </section>
+
+<RobloxPromo />
 
 <style>
 	.hero {

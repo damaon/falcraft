@@ -1,0 +1,13 @@
+{
+	// Cloudflare Workers static assets: serves the prerendered SvelteKit site from build/.
+	// Deploy: npm run build && npx wrangler deploy
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "bananini-games",
+	"compatibility_date": "2026-10-01",
+	"assets": {
+		"directory": "./build",
+		// /b/rocket -> build/b/rocket.html
+		"html_handling": "auto-trailing-slash",
+		"not_found_handling": "404-page"
+	}
+}

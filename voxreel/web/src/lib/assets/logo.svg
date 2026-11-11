@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Chimpanzini Bananini">
+  <title>Chimpanzini Bananini</title>
+  <g stroke="#22184f" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Banana body (the chimp sits inside it) -->
+    <path d="M40 72 C40 66 88 66 88 72 L88 86 C88 106 78 120 64 122 C50 120 40 106 40 86 Z" fill="#ffd60a"/>
+    <path d="M78 74 C80 96 76 110 66 120 C78 116 86 104 86 86 L86 74 Z" fill="#f2b705" stroke="none"/>
+    <path d="M60 121 C61 125 67 125 68 121 Z" fill="#6b4226"/>
+    <!-- Inside of the peel -->
+    <ellipse cx="64" cy="70" rx="24" ry="5" fill="#fff3b0"/>
+
+    <!-- Ears -->
+    <circle cx="35" cy="46" r="10" fill="#7a4a2a"/>
+    <circle cx="35" cy="46" r="5" fill="#e8b07a" stroke="none"/>
+    <circle cx="93" cy="46" r="10" fill="#7a4a2a"/>
+    <circle cx="93" cy="46" r="5" fill="#e8b07a" stroke="none"/>
+    <!-- Head -->
+    <circle cx="64" cy="44" r="28" fill="#7a4a2a"/>
+    <path d="M58 17 C60 10 66 9 68 14 C70 9 76 11 74 18" fill="#7a4a2a"/>
+    <!-- Face mask -->
+    <path d="M64 33 C58 26 42 28 43 42 C44 50 46 54 48 58 C50 68 58 72 64 72 C70 72 78 68 80 58 C82 54 84 50 85 42 C86 28 70 26 64 33 Z" fill="#f0c08a"/>
+    <!-- Eyes -->
+    <circle cx="55" cy="43" r="6.5" fill="#ffffff" stroke-width="2"/>
+    <circle cx="73" cy="43" r="6.5" fill="#ffffff" stroke-width="2"/>
+    <circle cx="56.5" cy="44" r="3.2" fill="#22184f" stroke="none"/>
+    <circle cx="74.5" cy="44" r="3.2" fill="#22184f" stroke="none"/>
+    <circle cx="57.6" cy="42.8" r="1.1" fill="#ffffff" stroke="none"/>
+    <circle cx="75.6" cy="42.8" r="1.1" fill="#ffffff" stroke="none"/>
+    <path d="M47 34 Q55 30 61 34 M67 34 Q73 30 81 34" fill="none" stroke-width="2.5"/>
+    <!-- Nose -->
+    <ellipse cx="61" cy="53" rx="1.6" ry="1.2" fill="#22184f" stroke="none"/>
+    <ellipse cx="67" cy="53" rx="1.6" ry="1.2" fill="#22184f" stroke="none"/>
+    <!-- Big grin -->
+    <path d="M51 58 Q64 72 77 58 Q64 63 51 58 Z" fill="#ffffff" stroke-width="2.5"/>
+    <path d="M58 64.5 Q64 69 70 64.5" fill="#ff7a9a" stroke="none"/>
+
+    <!-- Peel flaps hanging over the rim -->
+    <path d="M44 70 C30 70 20 82 17 98 C26 92 34 86 48 79 Z" fill="#ffd60a"/>
+    <path d="M84 70 C98 70 108 82 111 98 C102 92 94 86 80 79 Z" fill="#f2b705"/>
+    <path d="M54 72 C51 86 55 98 64 103 C73 98 77 86 74 72 Z" fill="#ffe45c"/>
+
+    <!-- Hands gripping the banana -->
+    <ellipse cx="45" cy="72" rx="7" ry="5.5" fill="#7a4a2a"/>
+    <ellipse cx="83" cy="72" rx="7" ry="5.5" fill="#7a4a2a"/>
+  </g>
+</svg>
