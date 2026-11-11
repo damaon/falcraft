@@ -86,6 +86,14 @@ struct VideoArgs {
     /// Opening hook showing the finished builds (battles only); 0 disables.
     #[arg(long, default_value_t = 1.5)]
     teaser_secs: f32,
+    /// Closing card with logo + "visit <site>" and the spoken brand; 0 disables.
+    #[arg(long, default_value_t = 5.5)]
+    outro_secs: f32,
+    #[arg(long, default_value = "bananini.games")]
+    site: String,
+    /// Overall loudness of the soundtrack (1.0 = normalized peak).
+    #[arg(long, default_value_t = 0.8)]
+    volume: f32,
     /// day | candy | sunset | night | moon | mint
     #[arg(long, default_value = "day")]
     theme: String,
@@ -171,6 +179,9 @@ fn config(v: &VideoArgs, kicker: &str, title: String) -> short::Config {
         lineup_question: "WHICH ONE IS THE BEST?".into(),
         theme: render::Theme::by_name(&v.theme),
         teaser_secs: v.teaser_secs,
+        outro_secs: v.outro_secs,
+        site: v.site.clone(),
+        volume: v.volume,
     }
 }
 

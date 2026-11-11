@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
-	import logo from '#lib/assets/logo.svg';
+	// Shared with the video renderer (voxreel/assets).
+	import logo from '../../../assets/logo.svg';
 	import Socials from '#lib/Socials.svelte';
 	import { ROBLOX_GAME_URL } from '#lib/links.ts';
 	import { resolve } from '$app/paths';

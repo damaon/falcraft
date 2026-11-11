@@ -130,7 +130,10 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     c += vec3<f32>(1.0, 0.85, 0.6) * pow(sd, 8.0) * 0.18 * smoothstep(0.12, 0.0, elev) * (1.0 - u.extra.z);
     // Puffy clouds just above the horizon, drifting slowly.
     if (u.extra.y > 0.0) {
-        let p = vec2<f32>(az * 3.0 + u.extra.x * 0.02, elev * 16.0);
+        // Coordinates on the horizontal unit circle are seamless all the way round (an
+        // azimuth angle would jump from +pi to -pi behind the camera).
+        let hz = normalize(vec2<f32>(dir.x, dir.z) + vec2<f32>(1e-5, 0.0));
+        let p = hz * 4.5 + vec2<f32>(elev * 16.0 + u.extra.x * 0.02, elev * 11.0);
         let n = fbm(p);
         let band = smoothstep(0.005, 0.03, elev);
         let cover = smoothstep(0.47, 0.62, n) * band * u.extra.y;

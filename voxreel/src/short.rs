@@ -38,7 +38,17 @@ pub struct Config {
     pub theme: Theme,
     /// Length of the opening hook (0 disables it). Only used with more than one entry.
     pub teaser_secs: f32,
+    /// Closing card with the logo and where to get the builds (0 disables it).
+    pub outro_secs: f32,
+    /// Shown and spoken in the outro, e.g. "bananini.games".
+    pub site: String,
+    /// Final mix level (1.0 = normalized).
+    pub volume: f32,
 }
+
+/// The Chimpanzini Bananini logo shared with the website.
+const LOGO_SVG: &[u8] = include_bytes!("../assets/logo.svg");
+
 
 #[derive(Clone, Copy)]
 enum Shot {
@@ -46,6 +56,8 @@ enum Shot {
     Teaser { start: f32 },
     Build { entry: usize, start: f32 },
     Lineup { start: f32 },
+    /// Closing card: logo, "visit <site>", spoken brand.
+    Outro { start: f32 },
 }
 
 pub struct Short {
@@ -106,6 +118,10 @@ impl Short {
             shots.push(Shot::Lineup { start: t });
             t += cfg.lineup_secs;
         }
+        if cfg.outro_secs > 0.0 {
+            shots.push(Shot::Outro { start: t });
+            t += cfg.outro_secs;
+        }
         let aspect = cfg.width as f32 / cfg.height as f32;
         // Safe area in NDC for the build: below the title block, above the bottom captions.
         let build_dist = entries.iter().map(|e| fit_distance(&e.anim, aspect, [-0.86, 0.86, -0.40, 0.42], BUILD_CAM)).collect();
@@ -122,13 +138,14 @@ impl Short {
             .iter()
             .rev()
             .find(|s| match s {
-                Shot::Build { start, .. } | Shot::Lineup { start } | Shot::Teaser { start } => *start <= t,
+                Shot::Build { start, .. } | Shot::Lineup { start } | Shot::Teaser { start } | Shot::Outro { start } => *start <= t,
             })
             .unwrap_or(&self.shots[0])
     }
 
-    pub fn soundtrack(&self) -> Track {
+    pub fn soundtrack(&self) -> Result<Track> {
         let mut tr = Track::new(self.duration);
+        tr.master = self.cfg.volume;
         for shot in &self.shots {
             match *shot {
                 Shot::Build { entry, start } => {
@@ -139,8 +156,19 @@ impl Short {
                     tr.build_ticks(start, a.landing_times(), a.voxels.len());
                     tr.chime(start + a.duration);
                 }
-                Shot::Teaser { start } => {
-                    tr.chime(start + 0.05);
+                // No sound on the opening hook: starting a video with a loud ping is jarring.
+                Shot::Teaser { .. } => {}
+                Shot::Outro { start } => {
+                    tr.whoosh(start - 0.25);
+                    // The logo popping in is the brand moment; the narrator carries the call to action.
+                    let site_spoken = self.cfg.site.replace('.', " dot ");
+                    let lines = [(format!("[excited] Get these builds at {site_spoken}! [shouts] Bananini Games!"), 0.6, 1.0)];
+                    for (text, at, gain) in lines {
+                        match crate::audio::speech(crate::audio::TTS_MODEL, crate::audio::TTS_VOICE, &text) {
+                            Ok(samples) => tr.clip(start + at, &samples, gain),
+                            Err(e) => eprintln!("  warning: no speech ({e:#}), outro stays silent"),
+                        }
+                    }
                 }
                 Shot::Lineup { start } => {
                     tr.whoosh(start - 0.25);
@@ -150,7 +178,7 @@ impl Short {
                 }
             }
         }
-        tr
+        Ok(tr)
     }
 
     fn scene(&self, a: &BuildAnim, t: f32, inst: &mut Vec<Instance>) {
@@ -273,6 +301,34 @@ impl Short {
         Ok(())
     }
 
+    fn overlay_outro(&self, lt: f32, frame: &mut [u8], text: &mut TextCache) -> Result<()> {
+        let (w, h) = (self.cfg.width as usize, self.cfg.height as usize);
+        let s = h as f32 / 1920.0;
+        let cx = w as f32 * 0.5;
+        let fade = |x: f32| (x / 0.3).clamp(0.0, 1.0);
+        // Logo pops in with a little overshoot, then bobs gently.
+        let k = (lt / 0.55).clamp(0.0, 1.0);
+        let back = 1.0 + 2.2 * (k - 1.0).powi(3) + 1.2 * (k - 1.0).powi(2);
+        let size = (640.0 * s * back.max(0.05)) as u32;
+        let bob = (lt * 2.6).sin() * 12.0 * s * k;
+        let logo = text.svg("logo", LOGO_SVG, size.max(8))?;
+        let lh = logo.h as f32;
+        logo.blit(frame, w, h, cx, 560.0 * s - lh * 0.5 + bob, 1.0);
+
+        let line1 = text.get("GET THESE BUILDS", Style::new(96.0 * s, WHITE));
+        line1.blit(frame, w, h, cx, 930.0 * s, fade(lt - 0.5));
+        let line2 = text.get("FOR MINECRAFT!", Style::new(96.0 * s, WHITE));
+        line2.blit(frame, w, h, cx, 1035.0 * s, fade(lt - 0.7));
+        let visit = text.get("VISIT", Style::new(70.0 * s, WHITE));
+        visit.blit(frame, w, h, cx, 1200.0 * s, fade(lt - 1.0));
+        let mut big = Style::new(132.0 * s, YELLOW);
+        big.max_width = 940.0 * s;
+        let site = self.cfg.site.to_uppercase();
+        let big = text.fit(&site, big, 1, 70.0 * s);
+        text.get(&site, big).blit(frame, w, h, cx, 1280.0 * s, fade(lt - 1.1));
+        Ok(())
+    }
+
     /// Empty scene (sky + ground) behind the panels so the gaps match the rest of the video.
     fn lineup_background(&self, main: &mut Renderer, inst: &mut Vec<Instance>, buf: &mut Vec<u8>) -> Result<()> {
         inst.clear();
@@ -299,6 +355,23 @@ impl Short {
                 main.render(inst, &view, buf)?;
                 self.overlay_build(entry, lt, buf, text);
             }
+            Shot::Outro { start } => {
+                // Look up at the sky so the logo sits on clouds, with a slow drift.
+                inst.clear();
+                let lt = t - start;
+                let view = View {
+                    eye: Vec3::new(lt * 1.5, 3.0, 80.0),
+                    target: Vec3::new(lt * 1.5, 16.0, 0.0),
+                    fov_y_deg: FOV_Y * 1.6,
+                    scene_center: Vec3::ZERO,
+                    scene_radius: 10.0,
+                    ground_y: -0.4,
+                    shift: [0.0, 0.0],
+                    time: t,
+                };
+                main.render(inst, &view, buf)?;
+                self.overlay_outro(t - start, buf, text)?;
+            }
             Shot::Lineup { start } | Shot::Teaser { start } => {
                 let teaser = matches!(self.shot_at(t), Shot::Teaser { .. });
                 let panel = match panel {
@@ -317,7 +390,7 @@ impl Short {
 
     pub fn render_video(&self, renderer: &mut Renderer, text: &mut TextCache, out: &Path) -> Result<()> {
         let wav = out.with_extension("wav");
-        self.soundtrack().write_wav(&wav)?;
+        self.soundtrack()?.write_wav(&wav)?;
         let mut enc = Encoder::start(out, self.cfg.width, self.cfg.height, self.cfg.fps, Some(&wav))?;
         let frames = (self.duration * self.cfg.fps as f32).ceil() as u32;
         let (mut inst, mut buf, mut panel) = (Vec::new(), Vec::new(), None);

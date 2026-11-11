@@ -58,6 +58,19 @@ fn wrap(font: &Font, text: &str, size: f32, max_width: f32) -> Vec<String> {
 }
 
 impl Sprite {
+    /// Rasterizes an SVG so its larger side is `size` pixels.
+    pub fn svg(data: &[u8], size: u32) -> Result<Self> {
+        let tree = resvg::usvg::Tree::from_data(data, &resvg::usvg::Options::default())?;
+        let ts = tree.size();
+        let scale = size as f32 / ts.width().max(ts.height());
+        let (w, h) = ((ts.width() * scale).ceil() as u32, (ts.height() * scale).ceil() as u32);
+        let mut pm = resvg::tiny_skia::Pixmap::new(w.max(1), h.max(1)).context("pixmap")?;
+        resvg::render(&tree, resvg::tiny_skia::Transform::from_scale(scale, scale), &mut pm.as_mut());
+        // tiny-skia pixels are premultiplied RGBA, which is what blit expects.
+        let px = pm.data().chunks_exact(4).map(|c| [0, 1, 2, 3].map(|k| c[k] as f32 / 255.0)).collect();
+        Ok(Self { w: w as usize, h: h as usize, px })
+    }
+
     pub fn text(font: &Font, text: &str, st: Style) -> Self {
         let lines = wrap(font, text, st.size, st.max_width);
         let pad = st.outline_px.ceil() as usize + 2;
@@ -183,10 +196,26 @@ impl TextCache {
     /// Shrinks the style until the text wraps to at most `max_lines`, so long prompts stay
     /// big without eating the whole frame.
     pub fn fit(&self, text: &str, mut st: Style, max_lines: usize, min_size: f32) -> Style {
-        while st.size > min_size && wrap(&self.font, text, st.size, st.max_width).len() > max_lines {
+        let too_big = |st: &Style| {
+            let lines = wrap(&self.font, text, st.size, st.max_width);
+            // A single long word can't wrap, so also check the widest line.
+            let widest = lines.iter().map(|l| l.chars().map(|c| self.font.metrics(c, st.size).advance_width).sum::<f32>()).fold(0.0, f32::max);
+            lines.len() > max_lines || widest > st.max_width
+        };
+        while st.size > min_size && too_big(&st) {
             st = Style { size: st.size * 0.92, outline_px: st.outline_px * 0.92, ..st };
         }
         st
+    }
+
+    /// SVG sprite cached per size (sizes are bucketed so animations don't rasterize every frame).
+    pub fn svg(&mut self, key: &str, data: &[u8], size: u32) -> Result<&Sprite> {
+        let size = (size / 4).max(1) * 4;
+        let k = format!("svg:{key}:{size}");
+        if !self.sprites.contains_key(&k) {
+            self.sprites.insert(k.clone(), Sprite::svg(data, size)?);
+        }
+        Ok(&self.sprites[&k])
     }
 
     pub fn get(&mut self, text: &str, st: Style) -> &Sprite {
