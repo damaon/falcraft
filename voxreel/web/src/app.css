@@ -1,0 +1,135 @@
+@font-face {
+	font-family: 'Lilita One';
+	/* Shared with the video renderer: voxreel/assets/fonts (SIL OFL). */
+	src: url('../../assets/fonts/LilitaOne-Regular.ttf') format('truetype');
+	font-display: swap;
+}
+
+:root {
+	--font-display: 'Lilita One', ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif;
+	--font-body: ui-rounded, 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+	--bg-top: #4aa8ff;
+	--bg-bottom: #c9ecff;
+	--surface: #ffffff;
+	--ink: #22184f;
+	--ink-soft: #5b5486;
+	--accent: #ffd60a;
+	--accent-ink: #22184f;
+	--pink: #ff5d8f;
+	--green: #2ec27e;
+	--shadow: 0 6px 0 rgba(34, 24, 79, 0.18), 0 14px 30px rgba(34, 24, 79, 0.15);
+	--radius: 24px;
+	color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--bg-top: #1c1650;
+		--bg-bottom: #3b2b7a;
+		--surface: #2a2260;
+		--ink: #fdfbff;
+		--ink-soft: #c9c2f2;
+		--shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 14px 30px rgba(0, 0, 0, 0.35);
+		color-scheme: dark;
+	}
+}
+
+:root[data-theme='dark'] {
+	--bg-top: #1c1650;
+	--bg-bottom: #3b2b7a;
+	--surface: #2a2260;
+	--ink: #fdfbff;
+	--ink-soft: #c9c2f2;
+	--shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 14px 30px rgba(0, 0, 0, 0.35);
+	color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	min-height: 100%;
+}
+
+body {
+	background: linear-gradient(180deg, var(--bg-top), var(--bg-bottom) 70vh) fixed;
+	background-color: var(--bg-bottom);
+	color: var(--ink);
+	font-family: var(--font-body);
+	font-size: 18px;
+	line-height: 1.45;
+	-webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+	font-family: var(--font-display);
+	font-weight: 400;
+	letter-spacing: 0.01em;
+	line-height: 1.05;
+	margin: 0;
+}
+
+a {
+	color: inherit;
+}
+
+.wrap {
+	width: min(1180px, 100% - 32px);
+	margin-inline: auto;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 48px;
+	padding: 10px 20px;
+	border: 0;
+	border-radius: 999px;
+	font: 20px/1 var(--font-display);
+	color: var(--accent-ink);
+	background: var(--accent);
+	box-shadow: 0 5px 0 #c9a400;
+	cursor: pointer;
+	text-decoration: none;
+	transition:
+		transform 0.08s ease,
+		box-shadow 0.08s ease;
+}
+
+.btn:active {
+	transform: translateY(4px);
+	box-shadow: 0 1px 0 #c9a400;
+}
+
+.btn.pink {
+	background: var(--pink);
+	color: #fff;
+	box-shadow: 0 5px 0 #c9306a;
+}
+
+.btn.green {
+	background: var(--green);
+	color: #fff;
+	box-shadow: 0 5px 0 #1d8d59;
+}
+
+.btn:focus-visible {
+	outline: 4px solid var(--ink);
+	outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.btn {
+		transition: none;
+	}
+}
