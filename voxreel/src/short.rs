@@ -211,17 +211,32 @@ impl Short {
         v
     }
 
-    fn overlay_build(&self, entry: usize, lt: f32, frame: &mut [u8], text: &mut TextCache) {
+    /// Header lines above the title: the site ("BANANINI.GAMES") and the kicker ("BUILD BATTLE").
+    /// Returns the y where the title goes.
+    fn header(&self, mut top: f32, frame: &mut [u8], text: &mut TextCache) -> f32 {
         let (w, h) = (self.cfg.width as usize, self.cfg.height as usize);
         let s = h as f32 / 1920.0;
         let cx = w as f32 * 0.5;
-        let e = &self.entries[entry];
-        let mut top = 190.0 * s;
+        if !self.cfg.site.is_empty() {
+            let site = self.cfg.site.to_uppercase();
+            let l = text.get(&site, Style::new(50.0 * s, WHITE));
+            l.blit(frame, w, h, cx, top, 1.0);
+            top += l.h as f32 - 10.0 * s;
+        }
         if !self.cfg.kicker.is_empty() {
             let k = text.get(&self.cfg.kicker, Style::new(60.0 * s, YELLOW));
             k.blit(frame, w, h, cx, top, 1.0);
             top += k.h as f32 - 8.0 * s;
         }
+        top
+    }
+
+    fn overlay_build(&self, entry: usize, lt: f32, frame: &mut [u8], text: &mut TextCache) {
+        let (w, h) = (self.cfg.width as usize, self.cfg.height as usize);
+        let s = h as f32 / 1920.0;
+        let cx = w as f32 * 0.5;
+        let e = &self.entries[entry];
+        let top = self.header(130.0 * s, frame, text);
         let mut big = Style::new(112.0 * s, WHITE);
         big.max_width = 980.0 * s;
         let big = text.fit(&self.cfg.title, big, 2, 64.0 * s);
@@ -279,13 +294,11 @@ impl Short {
             }
         }
         if teaser {
-            let k = text.get(&self.cfg.kicker, Style::new(60.0 * s, YELLOW));
-            let kh = k.h as f32;
-            k.blit(frame, w, h, w as f32 * 0.5, 120.0 * s, 1.0);
+            let top = self.header(70.0 * s, frame, text);
             let mut big = Style::new(96.0 * s, WHITE);
             big.max_width = 1000.0 * s;
             let big = text.fit(&self.cfg.title, big, 1, 40.0 * s);
-            text.get(&self.cfg.title, big).blit(frame, w, h, w as f32 * 0.5, 120.0 * s + kh - 8.0 * s, 1.0);
+            text.get(&self.cfg.title, big).blit(frame, w, h, w as f32 * 0.5, top, 1.0);
             let sub = "WHO BUILT IT BEST?".to_string();
             text.get(&sub, Style::new(70.0 * s, YELLOW)).blit(frame, w, h, w as f32 * 0.5, PANELS_BOTTOM * s + 10.0 * s, 1.0);
         } else {

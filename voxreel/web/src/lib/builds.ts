@@ -18,7 +18,8 @@ export interface Battle {
 const META: Record<string, Omit<Battle, 'slug' | 'builds'>> = {
 	'pirate-ship': { title: 'Pirate Ship', emoji: '🏴‍☠️', theme: 'day', tagline: 'A giant galleon, a cute boat or a treasure island?' },
 	'candy-castle': { title: 'Candy Castle', emoji: '🍭', theme: 'candy', tagline: 'Which sweet house would you live in?' },
-	rocket: { title: 'Rocket Ship', emoji: '🚀', theme: 'night', tagline: 'Which rocket gets to space first?' }
+	rocket: { title: 'Rocket Ship', emoji: '🚀', theme: 'night', tagline: 'Which rocket gets to space first?' },
+	'royal-city': { title: 'Royal City', emoji: '🏰', theme: 'day', tagline: 'A city gate, a royal castle or a canal town?' }
 };
 
 function titleCase(slug: string) {
