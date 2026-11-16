@@ -5,6 +5,7 @@
 //! - captions live in the top ~25% and around y=1350..1520,
 //! - the bottom ~20% is left clear because the YouTube Shorts UI covers it.
 
+use crate::actor::Actor;
 use crate::anim::BuildAnim;
 use crate::audio::Track;
 use crate::render::{Instance, Renderer, Theme, View};
@@ -20,14 +21,24 @@ pub struct Entry {
     /// Revealed in the final lineup ("CLAUDE OPUS 5.5").
     pub name: String,
     pub anim: BuildAnim,
+    /// Seconds to admire the finished build before the next shot.
+    pub hold: f32,
+    /// Line under the alias ("GROW THE TOMATOES"); replaces the block counter when set.
+    pub caption: String,
+    /// Characters walking and working in the scene (shot-local time).
+    pub actors: Vec<Actor>,
+}
+
+impl Entry {
+    fn shot_secs(&self) -> f32 {
+        self.anim.duration + self.hold
+    }
 }
 
 pub struct Config {
     pub width: u32,
     pub height: u32,
     pub fps: u32,
-    pub build_secs: f32,
-    pub hold_secs: f32,
     pub lineup_secs: f32,
     /// Small line above the title ("BUILD BATTLE").
     pub kicker: String,
@@ -44,6 +55,17 @@ pub struct Config {
     pub site: String,
     /// Final mix level (1.0 = normalized).
     pub volume: f32,
+    /// Question for an opening hook over the finished last entry ("HOW IS PIZZA MADE?");
+    /// empty = battle-style teaser (several entries) or none.
+    pub hook: String,
+    /// Side-by-side lineup + vote after the builds (battles).
+    pub lineup: bool,
+    /// Static scenery around every build shot (village, farm...), ready-made instances; empty = plate.
+    pub backdrop: Vec<Instance>,
+    /// Ambient sound beds under the whole short: "birds", "wind", "bees".
+    pub ambience: Vec<String>,
+    /// auto | videotoolbox | x264
+    pub encoder: String,
 }
 
 /// The Chimpanzini Bananini logo shared with the website.
@@ -54,6 +76,8 @@ const LOGO_SVG: &[u8] = include_bytes!("../assets/logo.svg");
 enum Shot {
     /// Opening hook: the finished builds, anonymous, before we show how they were made.
     Teaser { start: f32 },
+    /// Opening hook of a "how it's made" short: the finished product and the question.
+    Hook { start: f32 },
     Build { entry: usize, start: f32 },
     Lineup { start: f32 },
     /// Closing card: logo, "visit <site>", spoken brand.
@@ -105,16 +129,18 @@ impl Short {
     pub fn new(cfg: Config, entries: Vec<Entry>) -> Self {
         let mut shots = Vec::new();
         let mut t = 0.0;
-        if entries.len() > 1 && cfg.teaser_secs > 0.0 {
+        if !cfg.hook.is_empty() && cfg.teaser_secs > 0.0 {
+            shots.push(Shot::Hook { start: 0.0 });
+            t += cfg.teaser_secs;
+        } else if cfg.lineup && entries.len() > 1 && cfg.teaser_secs > 0.0 {
             shots.push(Shot::Teaser { start: 0.0 });
             t += cfg.teaser_secs;
         }
-        let per = cfg.build_secs + cfg.hold_secs;
-        for i in 0..entries.len() {
+        for (i, e) in entries.iter().enumerate() {
             shots.push(Shot::Build { entry: i, start: t });
-            t += per;
+            t += e.shot_secs();
         }
-        if entries.len() > 1 {
+        if cfg.lineup && entries.len() > 1 {
             shots.push(Shot::Lineup { start: t });
             t += cfg.lineup_secs;
         }
@@ -124,11 +150,17 @@ impl Short {
         }
         let aspect = cfg.width as f32 / cfg.height as f32;
         // Safe area in NDC for the build: below the title block, above the bottom captions.
-        let build_dist = entries.iter().map(|e| fit_distance(&e.anim, aspect, [-0.86, 0.86, -0.40, 0.42], BUILD_CAM)).collect();
+        let build_dist = entries
+            .iter()
+            .map(|e| {
+                let extra: Vec<Vec3> = e.actors.iter().flat_map(|a| a.bounds()).collect();
+                fit_distance(&e.anim, aspect, [-0.86, 0.86, -0.40, 0.42], BUILD_CAM, &extra)
+            })
+            .collect();
         let panel_h = panel_height(&cfg, entries.len());
         let panel_aspect = cfg.width as f32 / panel_h as f32;
         let (cam, safe) = panel_cam(&entries);
-        let panel_dist = entries.iter().map(|e| fit_distance(&e.anim, panel_aspect, safe, cam)).collect();
+        let panel_dist = entries.iter().map(|e| fit_distance(&e.anim, panel_aspect, safe, cam, &[])).collect();
         Self { cfg, entries, shots, duration: t, build_dist, panel_dist }
     }
 
@@ -138,7 +170,7 @@ impl Short {
             .iter()
             .rev()
             .find(|s| match s {
-                Shot::Build { start, .. } | Shot::Lineup { start } | Shot::Teaser { start } | Shot::Outro { start } => *start <= t,
+                Shot::Build { start, .. } | Shot::Lineup { start } | Shot::Teaser { start } | Shot::Hook { start } | Shot::Outro { start } => *start <= t,
             })
             .unwrap_or(&self.shots[0])
     }
@@ -146,8 +178,52 @@ impl Short {
     pub fn soundtrack(&self) -> Result<Track> {
         let mut tr = Track::new(self.duration);
         tr.master = self.cfg.volume;
+        // "How it's made" shorts get scenery ambience, woody block sounds and action foley.
+        let made = !self.cfg.hook.is_empty();
+        tr.boost = made;
+        for bed in &self.cfg.ambience {
+            match bed.as_str() {
+                "birds" => tr.birds(0.4, self.duration, 7),
+                "wind" => tr.wind(0.0, self.duration, 0.04, 11),
+                "bees" => tr.bees(0.0, self.duration, 0.04),
+                other => eprintln!("  warning: unknown ambience {other:?}"),
+            }
+        }
         for shot in &self.shots {
             match *shot {
+                Shot::Build { entry, start } if made => {
+                    let e = &self.entries[entry];
+                    let a = &e.anim;
+                    if start > 0.0 {
+                        tr.whoosh(start - 0.25);
+                    }
+                    tr.bloop(start + 0.1, 0.16);
+                    tr.build_thocks(start, a.landing_times(), a.voxels.len());
+                    if entry + 1 == self.entries.len() {
+                        tr.fanfare(start + a.duration);
+                    } else {
+                        tr.chime(start + a.duration);
+                    }
+                    for (k, actor) in e.actors.iter().enumerate() {
+                        for s in actor.footsteps() {
+                            tr.footstep(start + s);
+                        }
+                        for (i, (t, len, kind)) in actor.sound_events(e.shot_secs()).into_iter().enumerate() {
+                            let (t, seed) = (start + t, (entry * 7919 + k * 104729 + i * 31) as u32);
+                            match kind {
+                                "swish" => tr.swish(t, len, 1100.0, 0.16, seed),
+                                "thump" => tr.thump(t, 0.27),
+                                "knock" => tr.knock(t, 0.12, seed),
+                                "pop" => tr.pop(t, 0.22),
+                                "pour" => tr.pour(t, len, 0.09, seed),
+                                "munch" => tr.munch(t, 0.18, seed),
+                                "hop" => tr.footstep(t),
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                Shot::Hook { start } => tr.question(start + 0.2),
                 Shot::Build { entry, start } => {
                     let a = &self.entries[entry].anim;
                     if start > 0.0 {
@@ -155,6 +231,11 @@ impl Short {
                     }
                     tr.build_ticks(start, a.landing_times(), a.voxels.len());
                     tr.chime(start + a.duration);
+                    for actor in &self.entries[entry].actors {
+                        for s in actor.footsteps() {
+                            tr.footstep(start + s);
+                        }
+                    }
                 }
                 // No sound on the opening hook: starting a video with a loud ping is jarring.
                 Shot::Teaser { .. } => {}
@@ -181,8 +262,21 @@ impl Short {
         Ok(tr)
     }
 
+    /// Build voxels plus the entry's characters.
+    fn scene_entry(&self, e: &Entry, t: f32, actor_t: f32, inst: &mut Vec<Instance>) {
+        self.scene(&e.anim, t, inst);
+        for a in &e.actors {
+            a.instances(actor_t, inst);
+        }
+    }
+
     fn scene(&self, a: &BuildAnim, t: f32, inst: &mut Vec<Instance>) {
         inst.clear();
+        if !self.cfg.backdrop.is_empty() {
+            inst.extend_from_slice(&self.cfg.backdrop);
+            a.instances(t, Vec3::ZERO, inst);
+            return;
+        }
         let (w, d) = (a.size.x as f32, a.size.z as f32);
         inst.push(Instance::slab(
             Vec3::new(-w * 0.5 - PLATE_MARGIN, -0.4, -d * 0.5 - PLATE_MARGIN),
@@ -194,17 +288,28 @@ impl Short {
 
     fn build_view(&self, entry: usize, lt: f32) -> View {
         let a = &self.entries[entry].anim;
-        let per = self.cfg.build_secs + self.cfg.hold_secs;
+        let per = self.entries[entry].shot_secs();
         let full_h = a.size.y as f32;
         // Follow the build front: start close and low, pull back as it grows, then a slow
         // dolly-in during the hold so the shot never sits still.
         let grown = (a.height_at(lt) / full_h).clamp(0.0, 1.0);
-        let follow = 0.75 + 0.25 * grown.sqrt();
+        // With characters walking in from the start, frame the whole scene right away.
+        let people = !self.entries[entry].actors.is_empty();
+        let follow = if people { 1.0 } else { 0.75 + 0.25 * grown.sqrt() };
         let hold = ((lt - a.duration) / (per - a.duration).max(0.1)).clamp(0.0, 1.0);
         let zoom = follow * (1.0 - 0.08 * hold * (2.0 - hold));
         let angle = 0.6 + entry as f32 * 1.3 + lt * 0.42;
         let mut v = orbit_view(a, angle, self.build_dist[entry] * zoom, BUILD_CAM);
-        let target_y = (a.height_at(lt).max(3.0) * 0.5).min(full_h * 0.5);
+        if !self.cfg.backdrop.is_empty() {
+            // Let the scenery cast shadows near the build and stay visible into the distance.
+            v.scene_radius = v.scene_radius.max(80.0);
+            v.fog = 1.8;
+        }
+        let target_y = if people {
+            full_h.max(crate::actor::HEIGHT) * 0.5
+        } else {
+            (a.height_at(lt).max(3.0) * 0.5).min(full_h * 0.5)
+        };
         let delta = Vec3::new(0.0, target_y - v.target.y, 0.0);
         v.target += delta;
         v.eye += delta;
@@ -247,11 +352,31 @@ impl Short {
             let label = text.get(&e.alias, Style::new(104.0 * s, YELLOW));
             label.blit(frame, w, h, cx, 1340.0 * s + (1.0 - fade) * 40.0 * s, fade);
         }
+        if !e.caption.is_empty() {
+            let mut st = Style::new(80.0 * s, WHITE);
+            st.max_width = 960.0 * s;
+            let st = text.fit(&e.caption, st, 2, 52.0 * s);
+            text.get(&e.caption, st).blit(frame, w, h, cx, 1460.0 * s + (1.0 - fade) * 30.0 * s, fade);
+            return;
+        }
         let placed = e.anim.landing_times().filter(|l| *l <= lt).count();
         let done = placed == e.anim.voxels.len();
         let counter = format!("{placed} BLOCKS");
         let col = if done { YELLOW } else { WHITE };
         text.get(&counter, Style::new(60.0 * s, col)).blit(frame, w, h, cx, 1470.0 * s, 1.0);
+    }
+
+    /// Hook: the question in the title spot, with a gentle pulse so the first frame isn't static.
+    fn overlay_hook(&self, lt: f32, frame: &mut [u8], text: &mut TextCache) {
+        let (w, h) = (self.cfg.width as usize, self.cfg.height as usize);
+        let s = h as f32 / 1920.0;
+        let cx = w as f32 * 0.5;
+        let top = self.header(130.0 * s, frame, text);
+        let pulse = 1.0 + 0.04 * (lt * 7.0).sin().max(0.0);
+        let mut big = Style::new(120.0 * s * pulse, WHITE);
+        big.max_width = 1000.0 * s;
+        let big = text.fit(&self.cfg.hook, big, 2, 64.0 * s);
+        text.get(&self.cfg.hook, big).blit(frame, w, h, cx, top, 1.0);
     }
 
     /// Lineup: one horizontal panel per build, stacked vertically, each orbiting in sync.
@@ -354,6 +479,7 @@ impl Short {
             ground_y: -0.4,
             shift: [0.0, 0.0],
             time: 0.0,
+            fog: 1.0,
         };
         main.render(inst, &view, buf)
     }
@@ -362,11 +488,22 @@ impl Short {
         match self.shot_at(t) {
             Shot::Build { entry, start } => {
                 let lt = t - start;
-                self.scene(&self.entries[entry].anim, lt, inst);
+                self.scene_entry(&self.entries[entry], lt, lt, inst);
                 let mut view = self.build_view(entry, lt);
                 view.time = t;
                 main.render(inst, &view, buf)?;
                 self.overlay_build(entry, lt, buf, text);
+            }
+            Shot::Hook { start } => {
+                // The finished product, orbiting on from where the last shot will leave it, so
+                // the end of the short loops back into its start.
+                let last = self.entries.len() - 1;
+                let e = &self.entries[last];
+                self.scene_entry(e, 1e6, e.shot_secs() + (t - start), inst);
+                let mut view = self.build_view(last, e.shot_secs() + (t - start));
+                view.time = t;
+                main.render(inst, &view, buf)?;
+                self.overlay_hook(t - start, buf, text);
             }
             Shot::Outro { start } => {
                 // Look up at the sky so the logo sits on clouds, with a slow drift.
@@ -381,6 +518,7 @@ impl Short {
                     ground_y: -0.4,
                     shift: [0.0, 0.0],
                     time: t,
+                    fog: 1.0,
                 };
                 main.render(inst, &view, buf)?;
                 self.overlay_outro(t - start, buf, text)?;
@@ -404,19 +542,33 @@ impl Short {
     pub fn render_video(&self, renderer: &mut Renderer, text: &mut TextCache, out: &Path) -> Result<()> {
         let wav = out.with_extension("wav");
         self.soundtrack()?.write_wav(&wav)?;
-        let mut enc = Encoder::start(out, self.cfg.width, self.cfg.height, self.cfg.fps, Some(&wav))?;
+        let mut enc = Encoder::start(out, self.cfg.width, self.cfg.height, self.cfg.fps, Some(&wav), &self.cfg.encoder)?;
         let frames = (self.duration * self.cfg.fps as f32).ceil() as u32;
         let (mut inst, mut buf, mut panel) = (Vec::new(), Vec::new(), None);
         let started = std::time::Instant::now();
+        let (mut t_frame, mut t_enc) = (0.0f64, 0.0f64);
         for f in 0..frames {
             let t = f as f32 / self.cfg.fps as f32;
+            let a = std::time::Instant::now();
             self.frame(t, renderer, &mut panel, text, &mut inst, &mut buf)?;
+            let b = std::time::Instant::now();
             enc.frame(&buf)?;
+            t_frame += (b - a).as_secs_f64();
+            t_enc += b.elapsed().as_secs_f64();
             if f % self.cfg.fps == 0 {
                 eprint!("\r  frame {f}/{frames} ({:.0} fps)  ", f as f32 / started.elapsed().as_secs_f32().max(1e-3));
             }
         }
+        let fin = std::time::Instant::now();
         enc.finish()?;
+        let per = |x: f64| x * 1000.0 / frames.max(1) as f64;
+        eprintln!(
+            "\r  per frame: render {:.1} ms (gpu {:.1} ms), encoder wait {:.1} ms; encoder tail {:.1}s",
+            per(t_frame),
+            per(renderer.gpu_secs),
+            per(t_enc),
+            fin.elapsed().as_secs_f32()
+        );
         let _ = std::fs::remove_file(&wav);
         eprintln!("\r  {frames} frames in {:.1}s -> {}", started.elapsed().as_secs_f32(), out.display());
         Ok(())
@@ -457,13 +609,14 @@ fn orbit_view(a: &BuildAnim, angle: f32, dist: f32, cam: Cam) -> View {
         ground_y: -0.4,
         shift: cam.shift,
         time: 0.0,
+        fog: 1.0,
     }
 }
 
 /// Smallest camera distance at which the build (its voxels plus the plate corners) stays inside
 /// the NDC rectangle `[x_min, x_max, y_min, y_max]` from every orbit angle. Fitting to voxels
 /// rather than the bounding box matters for spiky shapes (wings, tails) that leave the box mostly empty.
-fn fit_distance(a: &BuildAnim, aspect: f32, safe: [f32; 4], cam: Cam) -> f32 {
+fn fit_distance(a: &BuildAnim, aspect: f32, safe: [f32; 4], cam: Cam, extra: &[Vec3]) -> f32 {
     let (w, d) = (a.size.x as f32, a.size.z as f32);
     let center = Vec3::new(w * 0.5, 0.0, d * 0.5);
     let stride = (a.voxels.len() / 6000).max(1);
@@ -471,6 +624,7 @@ fn fit_distance(a: &BuildAnim, aspect: f32, safe: [f32; 4], cam: Cam) -> f32 {
     for (sx, sz) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
         corners.push(Vec3::new(sx * (w * 0.5 + PLATE_MARGIN), -0.4, sz * (d * 0.5 + PLATE_MARGIN)));
     }
+    corners.extend_from_slice(extra);
     let fits = |dist: f32| {
         (0..24).all(|k| {
             let v = orbit_view(a, k as f32 / 24.0 * std::f32::consts::TAU, dist, cam);

@@ -1,6 +1,7 @@
 [tools]
 rust = "1.91"
 node = "24"
+python = "3.12"
 
 [tasks.build]
 run = "cargo build --release"
@@ -30,3 +31,13 @@ description = "Export Minecraft downloads, build the website and deploy it to Cl
 depends = ["export"]
 dir = "web"
 run = "npm run build && npx wrangler@4 deploy"
+
+[tasks.trends]
+description = "Trend scan of kid-friendly Minecraft/voxel Shorts: mise run trends [-- --period day]"
+dir = "research"
+run = "uv run --env-file .env trends.py"
+
+[tasks.upload]
+description = "Upload a short to YouTube (private by default): mise run upload -- <video.mp4> <videos/name.json>"
+dir = "publish"
+run = "uv run upload.py"

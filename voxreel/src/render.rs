@@ -22,7 +22,12 @@ pub struct Instance {
     pub size: [f32; 3],
     pub glow: f32,
     pub ao: [u32; 2],
+    /// Rotation (quaternion xyzw) about `pos`; identity for grid voxels.
+    pub rot: [f32; 4],
 }
+
+const NO_AO: [u32; 2] = [u32::MAX, u32::MAX >> 16];
+const IDENTITY: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
 
 impl Instance {
     /// A unit voxel at `pos` (min corner) shrunk around its centre by `scale`.
@@ -33,6 +38,20 @@ impl Instance {
             size: [scale; 3],
             glow,
             ao,
+            rot: IDENTITY,
+        }
+    }
+
+    /// A box of `size` whose min corner sits at `pos`, rotated by `rot` around that corner
+    /// (character parts: the caller transforms the corner, the GPU rotates the box).
+    pub fn rotated(pos: Vec3, size: Vec3, rot: glam::Quat, c: [u8; 3]) -> Self {
+        Self {
+            pos: pos.to_array(),
+            color: u32::from_le_bytes([c[0], c[1], c[2], 255]),
+            size: size.to_array(),
+            glow: 0.0,
+            ao: NO_AO,
+            rot: rot.to_array(),
         }
     }
 
@@ -43,7 +62,8 @@ impl Instance {
             color: u32::from_le_bytes([c[0], c[1], c[2], 255]),
             size: (max - min).to_array(),
             glow: 0.0,
-            ao: [u32::MAX, u32::MAX >> 16],
+            ao: NO_AO,
+            rot: IDENTITY,
         }
     }
 }
@@ -158,6 +178,8 @@ pub struct View {
     pub shift: [f32; 2],
     /// Seconds, drives cloud drift.
     pub time: f32,
+    /// Fog distance multiplier (1 = default; bigger sees further, for scenery backdrops).
+    pub fog: f32,
 }
 
 impl View {
@@ -168,6 +190,10 @@ impl View {
 }
 
 pub struct Renderer {
+    /// Seconds spent waiting for the GPU (submit to readback), for profiling.
+    pub gpu_secs: f64,
+    /// Ground checker square size in voxels; 0 = the classic 4-voxel checker with a 1-voxel grid.
+    pub ground_block: f32,
     pub width: u32,
     pub height: u32,
     device: wgpu::Device,
@@ -342,7 +368,7 @@ impl Renderer {
         });
 
         let vertex_attrs = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Uint32];
-        let instance_attrs = wgpu::vertex_attr_array![3 => Float32x3, 4 => Unorm8x4, 5 => Float32x3, 6 => Float32, 7 => Uint32x2];
+        let instance_attrs = wgpu::vertex_attr_array![3 => Float32x3, 4 => Unorm8x4, 5 => Float32x3, 6 => Float32, 7 => Uint32x2, 8 => Float32x4];
         let cube_buffers = [
             wgpu::VertexBufferLayout {
                 array_stride: std::mem::size_of::<Vertex>() as u64,
@@ -418,6 +444,8 @@ impl Renderer {
         let sky_pipe = mk_main("sky", "vs_sky", "fs_sky", &[], depth_state(false, wgpu::CompareFunction::Always));
 
         Ok(Self {
+            gpu_secs: 0.0,
+            ground_block: 0.0,
             width,
             height,
             device,
@@ -472,9 +500,9 @@ impl Renderer {
             sky_horizon: lin(t.sky_horizon),
             ground: lin(t.ground),
             ground2: lin(t.ground2),
-            extra: [view.time, t.clouds, t.stars, 0.0],
+            extra: [view.time, t.clouds, t.stars, self.ground_block],
             res: [self.width as f32, self.height as f32, 0.0, 0.0],
-            params: [dist * 1.2, dist * 3.5, 1.0 / SHADOW_SIZE as f32, view.ground_y],
+            params: [dist * 1.2 * view.fog, dist * 3.5 * view.fog, 1.0 / SHADOW_SIZE as f32, view.ground_y],
         };
         self.queue.write_buffer(&self.uniform_buf, 0, bytemuck::bytes_of(&u));
 
@@ -546,11 +574,13 @@ impl Renderer {
             },
             wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
         );
+        let submitted = std::time::Instant::now();
         self.queue.submit([enc.finish()]);
 
         let slice = self.readback.slice(..);
         slice.map_async(wgpu::MapMode::Read, |_| {});
         self.device.poll(wgpu::PollType::Wait).context("device poll")?;
+        self.gpu_secs += submitted.elapsed().as_secs_f64();
         {
             let data = slice.get_mapped_range();
             let row = (self.width * 4) as usize;

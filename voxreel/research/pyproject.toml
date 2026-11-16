@@ -1,0 +1,12 @@
+[project]
+name = "voxreel-research"
+version = "0.1.0"
+description = "Daily trend scan of kid-friendly Minecraft / voxel Shorts (views, formats, sounds)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "yt-dlp[default]>=2026.10.26",
+  "shazamio>=0.8",
+]
+
+[tool.uv]
+package = false

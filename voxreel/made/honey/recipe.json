@@ -1,0 +1,244 @@
+{
+  "title": "Honey",
+  "hook": "How is honey made?",
+  "theme": "day",
+  "backdrop": "backdrop.json",
+  "ambience": [
+    "birds",
+    "bees",
+    "wind"
+  ],
+  "step_secs": 2.2,
+  "step_hold": 2.0,
+  "product_secs": 3.0,
+  "product_hold": 2.5,
+  "steps": [
+    {
+      "build": "1.json",
+      "caption": "Flowers bloom",
+      "actors": [
+        {
+          "skin": "steve",
+          "path": [
+            [
+              1,
+              17
+            ],
+            [
+              6,
+              16
+            ]
+          ],
+          "action": "water",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            8,
+            9
+          ],
+          "hat": "bee",
+          "outfit": "beekeeper",
+          "item": "watering_can"
+        },
+        {
+          "skin": "alex",
+          "path": [
+            [
+              29,
+              28
+            ],
+            [
+              22,
+              24
+            ]
+          ],
+          "action": "pick",
+          "start": 0.4,
+          "y": 1,
+          "face": [
+            20,
+            18
+          ],
+          "item": "flower"
+        }
+      ]
+    },
+    {
+      "build": "2.json",
+      "caption": "Bees bring the nectar home",
+      "actors": [
+        {
+          "skin": "steve",
+          "path": [
+            [
+              2,
+              29
+            ],
+            [
+              9,
+              24
+            ]
+          ],
+          "action": "pick",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            9,
+            14
+          ],
+          "hat": "bee",
+          "outfit": "beekeeper"
+        }
+      ]
+    },
+    {
+      "build": "3.json",
+      "caption": "They fill the honeycomb",
+      "actors": [
+        {
+          "skin": "steve",
+          "path": [
+            [
+              1,
+              21
+            ],
+            [
+              8,
+              17
+            ]
+          ],
+          "action": "knead",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            8,
+            10
+          ],
+          "hat": "bee",
+          "outfit": "beekeeper"
+        },
+        {
+          "skin": "alex",
+          "path": [
+            [
+              29,
+              21
+            ],
+            [
+              21,
+              17
+            ]
+          ],
+          "action": "pick",
+          "start": 0.4,
+          "y": 1,
+          "face": [
+            21,
+            10
+          ],
+          "hat": "bee",
+          "outfit": "beekeeper"
+        }
+      ]
+    },
+    {
+      "build": "4.json",
+      "caption": "Pour it into jars",
+      "actors": [
+        {
+          "skin": "steve",
+          "path": [
+            [
+              1,
+              29
+            ],
+            [
+              12,
+              26
+            ]
+          ],
+          "action": "water",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            14,
+            14
+          ],
+          "hat": "bee",
+          "outfit": "beekeeper",
+          "item": "honey_jar"
+        },
+        {
+          "skin": "alex",
+          "path": [
+            [
+              29,
+              29
+            ],
+            [
+              23,
+              26
+            ]
+          ],
+          "action": "carry",
+          "start": 0.4,
+          "y": 1,
+          "face": [
+            24,
+            14
+          ],
+          "item": "honey_jar"
+        }
+      ]
+    }
+  ],
+  "product": {
+    "build": "product.json",
+    "caption": "Sweet honey!",
+    "actors": [
+      {
+        "skin": "alex",
+        "path": [
+          [
+            2,
+            28
+          ],
+          [
+            7,
+            25
+          ]
+        ],
+        "action": "eat",
+        "start": 0.0,
+        "y": 1,
+        "face": [
+          16,
+          16
+        ],
+        "item": "honey_jar"
+      },
+      {
+        "skin": "steve",
+        "path": [
+          [
+            30,
+            28
+          ],
+          [
+            25,
+            25
+          ]
+        ],
+        "action": "cheer",
+        "start": 0.3,
+        "y": 1,
+        "face": [
+          16,
+          16
+        ],
+        "hat": "bee",
+        "outfit": "beekeeper"
+      }
+    ]
+  }
+}

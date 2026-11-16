@@ -12,6 +12,8 @@ const GLOW_SECS: f32 = 0.25;
 
 pub struct BuildAnim {
     pub size: IVec3,
+    /// Spec coordinate of the tight bounds' min corner (voxels are re-based onto it).
+    pub origin: IVec3,
     /// Voxels in build order with their drop start time (seconds from build start).
     pub voxels: Vec<(IVec3, [u8; 3], f32)>,
     /// Lookup grid: start time per cell, f32::INFINITY when empty.
@@ -52,7 +54,7 @@ impl BuildAnim {
             let y = p.y as usize;
             layer_starts[y] = layer_starts[y].min(*t);
         }
-        Self { size: s, voxels, start, duration, layer_starts }
+        Self { size: s, origin: lo, voxels, start, duration, layer_starts }
     }
 
     #[inline]

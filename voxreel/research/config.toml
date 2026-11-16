@@ -1,0 +1,41 @@
+# Trend scan config for research/trends.py. Edit freely: hashtags, tracked channels, blocklist.
+
+period = "week"        # day | week | month: what counts as "hot right now"
+per_hashtag = 60       # Shorts read from each hashtag page
+details = 60           # candidates (most viewed, spread over groups) that get full details
+top = 30               # videos in the "hot right now" table
+music_top = 15         # top videos whose sound is identified with Shazam
+track_channels = 10    # top channels whose newest Shorts are checked for outliers
+pause = 2.0            # seconds between watch-page requests without an API key (YouTube blocks bursts)
+
+# Query groups = formats to compare. Each is a list of hashtags (youtube.com/hashtag/<tag>/shorts).
+[groups]
+builds = ["minecraftbuild", "minecraftbuilding", "minecrafthouse", "minecraftbuildhacks"]
+redstone = ["minecraftredstone", "redstone", "minecraftmachine", "createmod"]
+terrain = ["minecraftlandscape", "terraforming", "minecraftseed", "minecraftworld"]
+animation = ["minecraftanimation", "minecraftanimations", "voxelanimation", "minecraftsatisfying"]
+
+# Fresh uploads (inside the period) by views, via YouTube Data API search; needs YOUTUBE_API_KEY.
+# Each query costs 100 of the 10,000 free daily quota units. Same group names as above.
+[search]
+builds = ["minecraft build", "minecraft timelapse"]
+redstone = ["minecraft create mod machine", "minecraft redstone machine", "minecraft walking machine"]
+terrain = ["minecraft terraforming", "minecraft landscape"]
+animation = ["minecraft animation", "voxel animation"]
+
+# Channels always scanned (their /shorts tab), e.g. "@SomeChannel" or a channel URL.
+[channels]
+always = []
+
+# Kid-safe filter: a video is left out when its title, tags or description matches one of these
+# (whole words, case-insensitive). Brainrot memes, gross-out and scary stuff.
+[filter]
+blocklist = [
+  "skibidi", "brainrot", "ohio", "sigma", "rizz", "gyatt", "mewing", "fanum", "aura farming",
+  "tung tung", "sahur", "bombardiro", "crocodilo", "tralalero", "tralala", "ballerina cappuccina",
+  "cappuccino assassino", "brr brr patapim", "lirili larila", "chimpanzini", "bananini", "sprunki",
+  "67", "six seven",
+  "fat", "fatter", "inflated", "inflation", "pregnant", "toilet", "poop", "fart",
+  "horror", "scary", "creepy", "jumpscare", "blood", "gore", "dead", "kill", "killed", "murder",
+  "prank", "girlfriend", "boyfriend", "kiss", "crush",
+]

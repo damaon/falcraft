@@ -186,7 +186,7 @@ pub fn parse_color(s: &str) -> Result<[u8; 3]> {
 }
 
 /// Max edge length we accept, so a model asking for 1000^3 cannot blow up memory/render time.
-pub const MAX_SIZE: i32 = 96;
+pub const MAX_SIZE: i32 = 512;
 
 impl BuildSpec {
     /// Lenient parsing of LLM output: strips markdown fences / prose around the JSON object,

@@ -32,10 +32,16 @@ struct IIn {
     @location(5) size: vec3<f32>,
     @location(6) glow: f32,
     @location(7) ao: vec2<u32>,
+    @location(8) rot: vec4<f32>,
 };
 
+fn qrot(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
+    let t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
+
 fn world_of(v: VIn, i: IIn) -> vec3<f32> {
-    return i.pos + v.pos * i.size;
+    return i.pos + qrot(i.rot, v.pos * i.size);
 }
 
 @vertex
@@ -50,6 +56,8 @@ struct VOut {
     @location(2) color: vec3<f32>,
     @location(3) ao: f32,
     @location(4) glow: f32,
+    // Texture pixel size for big world blocks (16 px per block face), 0 = flat colour.
+    @location(5) texel: f32,
 };
 
 @vertex
@@ -58,12 +66,14 @@ fn vs_cube(v: VIn, i: IIn) -> VOut {
     let w = world_of(v, i);
     o.clip = u.view_proj * vec4<f32>(w, 1.0);
     o.world = w;
-    o.normal = v.normal;
+    o.normal = qrot(i.rot, v.normal);
     o.color = pow(i.color.rgb, vec3<f32>(2.2));
     let word = select(i.ao.x, i.ao.y, v.corner >= 16u);
     let shift = (v.corner % 16u) * 2u;
     o.ao = f32((word >> shift) & 3u) / 3.0;
     o.glow = i.glow;
+    let cube = abs(i.size.x - i.size.y) < 0.01 && abs(i.size.x - i.size.z) < 0.01;
+    o.texel = select(0.0, i.size.x / 16.0, cube && i.size.x > 3.0);
     return o;
 }
 
@@ -171,10 +181,20 @@ fn light(albedo: vec3<f32>, n: vec3<f32>, world: vec3<f32>, ao: f32) -> vec3<f32
     return albedo * (direct * 1.6 + ambient * 0.9);
 }
 
+fn hash3(p: vec3<f32>) -> f32 {
+    return fract(sin(dot(p, vec3<f32>(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
 @fragment
 fn fs_cube(i: VOut) -> @location(0) vec4<f32> {
     let n = normalize(i.normal);
-    var c = light(i.color, n, i.world, i.ao);
+    var base = i.color;
+    if (i.texel > 0.0) {
+        // Minecraft-like block texture: per-pixel brightness noise on a 16x16 grid per face.
+        let cell = floor((i.world - n * 0.01) / i.texel);
+        base = base * (0.88 + 0.24 * hash3(cell));
+    }
+    var c = light(base, n, i.world, i.ao);
     c += i.color * i.glow * 2.0 + vec3<f32>(i.glow * 0.25);
     return vec4<f32>(vignette(fog(tonemap(c), i.world), i.clip.xy), 1.0);
 }
@@ -200,11 +220,15 @@ fn vs_ground(@builtin(vertex_index) vi: u32) -> GOut {
 
 @fragment
 fn fs_ground(i: GOut) -> @location(0) vec4<f32> {
-    // Soft anti-aliased 4x4 checker plus a faint unit grid.
+    // Soft anti-aliased checker (4 voxels, or one square per "block" when extra.w is set) plus a
+    // faint grid (every voxel, or every block).
     let p = i.world.xz;
-    let s = sin(p.x * 0.7853982) * sin(p.y * 0.7853982);
+    let blocky = u.extra.w > 0.0;
+    let q = select(p, p * (4.0 / max(u.extra.w, 1e-3)), blocky);
+    let s = sin(q.x * 0.7853982) * sin(q.y * 0.7853982);
     let k = clamp(s / max(fwidth(s) * 1.5, 1e-4) * 0.5 + 0.5, 0.0, 1.0);
-    let g = abs(fract(p - 0.5) - 0.5) / fwidth(p);
+    let gp = select(p, p / max(u.extra.w, 1e-3), blocky);
+    let g = abs(fract(gp - 0.5) - 0.5) / fwidth(gp);
     let line = 1.0 - min(min(g.x, g.y), 1.0);
     let base = mix(u.ground.rgb, u.ground2.rgb, k) * (1.0 - line * 0.05);
     let c = light(base, vec3<f32>(0.0, 1.0, 0.0), i.world, 1.0);

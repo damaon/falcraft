@@ -1,0 +1,268 @@
+{
+  "title": "Ice cream",
+  "hook": "How is ice cream made?",
+  "theme": "day",
+  "backdrop": "backdrop.json",
+  "ambience": [
+    "birds",
+    "wind"
+  ],
+  "step_secs": 2.2,
+  "step_hold": 2.0,
+  "product_secs": 3.0,
+  "product_hold": 2.5,
+  "steps": [
+    {
+      "build": "1.json",
+      "caption": "Milk the cow",
+      "actors": [
+        {
+          "skin": "steve",
+          "path": [
+            [
+              2,
+              27
+            ],
+            [
+              12,
+              26
+            ]
+          ],
+          "action": "pick",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            12,
+            15
+          ],
+          "hat": "straw",
+          "outfit": "farmer"
+        },
+        {
+          "skin": "alex",
+          "path": [
+            [
+              28,
+              28
+            ],
+            [
+              19,
+              28
+            ]
+          ],
+          "action": "carry",
+          "start": 0.4,
+          "y": 1,
+          "face": [
+            12,
+            15
+          ],
+          "hat": "straw",
+          "outfit": "farmer",
+          "item": "bucket"
+        }
+      ]
+    },
+    {
+      "build": "2.json",
+      "caption": "Pick the strawberries",
+      "actors": [
+        {
+          "skin": "alex",
+          "path": [
+            [
+              1,
+              19
+            ],
+            [
+              9,
+              18
+            ]
+          ],
+          "action": "pick",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            9,
+            14
+          ],
+          "hat": "straw",
+          "outfit": "farmer",
+          "item": "strawberry"
+        },
+        {
+          "skin": "steve",
+          "path": [
+            [
+              29,
+              19
+            ],
+            [
+              21,
+              18
+            ]
+          ],
+          "action": "pick",
+          "start": 0.4,
+          "y": 1,
+          "face": [
+            21,
+            14
+          ],
+          "hat": "straw",
+          "outfit": "farmer",
+          "item": "strawberry"
+        }
+      ]
+    },
+    {
+      "build": "3.json",
+      "caption": "Mix it and freeze it",
+      "actors": [
+        {
+          "skin": "steve",
+          "path": [
+            [
+              29,
+              29
+            ],
+            [
+              23,
+              25
+            ]
+          ],
+          "action": "knead",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            17,
+            18
+          ],
+          "hat": "chef",
+          "outfit": "chef"
+        },
+        {
+          "skin": "alex",
+          "path": [
+            [
+              0,
+              29
+            ],
+            [
+              6,
+              24
+            ]
+          ],
+          "action": "carry",
+          "start": 0.3,
+          "y": 1,
+          "face": [
+            12,
+            15
+          ],
+          "hat": "chef",
+          "outfit": "chef",
+          "item": "strawberry"
+        }
+      ]
+    },
+    {
+      "build": "4.json",
+      "caption": "Scoop it up",
+      "actors": [
+        {
+          "skin": "steve",
+          "path": [
+            [
+              1,
+              29
+            ],
+            [
+              9,
+              27
+            ]
+          ],
+          "action": "stir",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            9,
+            15
+          ],
+          "hat": "chef",
+          "outfit": "chef",
+          "item": "scoop"
+        },
+        {
+          "skin": "alex",
+          "path": [
+            [
+              29,
+              29
+            ],
+            [
+              21,
+              27
+            ]
+          ],
+          "action": "wave",
+          "start": 0.5,
+          "y": 1,
+          "face": [
+            21,
+            15
+          ]
+        }
+      ]
+    }
+  ],
+  "product": {
+    "build": "product.json",
+    "caption": "Ice cream time!",
+    "actors": [
+      {
+        "skin": "alex",
+        "path": [
+          [
+            0,
+            26
+          ],
+          [
+            5,
+            22
+          ]
+        ],
+        "action": "eat",
+        "start": 0.0,
+        "y": 0,
+        "face": [
+          15,
+          15
+        ],
+        "item": "ice_cream"
+      },
+      {
+        "skin": "steve",
+        "path": [
+          [
+            30,
+            26
+          ],
+          [
+            25,
+            22
+          ]
+        ],
+        "action": "cheer",
+        "start": 0.3,
+        "y": 0,
+        "face": [
+          15,
+          15
+        ],
+        "hat": "chef",
+        "outfit": "chef"
+      }
+    ]
+  }
+}

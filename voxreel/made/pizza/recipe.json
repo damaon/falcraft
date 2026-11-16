@@ -1,0 +1,248 @@
+{
+  "title": "Pizza",
+  "hook": "How is pizza made?",
+  "theme": "day",
+  "backdrop": "backdrop.json",
+  "ambience": [
+    "birds",
+    "wind"
+  ],
+  "step_secs": 2.2,
+  "step_hold": 2.0,
+  "product_secs": 3.0,
+  "product_hold": 2.5,
+  "steps": [
+    {
+      "build": "1.json",
+      "caption": "Grow the tomatoes",
+      "actors": [
+        {
+          "skin": "alex",
+          "path": [
+            [
+              3,
+              14
+            ],
+            [
+              11,
+              14
+            ]
+          ],
+          "action": "water",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            7,
+            19
+          ],
+          "hat": "straw",
+          "outfit": "farmer",
+          "item": "watering_can"
+        },
+        {
+          "skin": "steve",
+          "path": [
+            [
+              27,
+              15
+            ],
+            [
+              19,
+              15
+            ]
+          ],
+          "action": "pick",
+          "start": 0.5,
+          "y": 1,
+          "face": [
+            23,
+            9
+          ],
+          "hat": "straw",
+          "outfit": "farmer",
+          "item": "tomato"
+        }
+      ]
+    },
+    {
+      "build": "2.json",
+      "caption": "Mix the dough",
+      "actors": [
+        {
+          "skin": "steve",
+          "path": [
+            [
+              28,
+              29
+            ],
+            [
+              10,
+              27
+            ]
+          ],
+          "action": "stir",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            10,
+            18
+          ],
+          "hat": "chef",
+          "outfit": "chef",
+          "item": "spoon"
+        }
+      ]
+    },
+    {
+      "build": "3.json",
+      "caption": "Add sauce and cheese",
+      "actors": [
+        {
+          "skin": "steve",
+          "path": [
+            [
+              1,
+              29
+            ],
+            [
+              12,
+              27
+            ]
+          ],
+          "action": "knead",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            13,
+            15
+          ],
+          "hat": "chef",
+          "outfit": "chef"
+        },
+        {
+          "skin": "alex",
+          "path": [
+            [
+              29,
+              29
+            ],
+            [
+              23,
+              27
+            ]
+          ],
+          "action": "chop",
+          "start": 0.4,
+          "y": 1,
+          "face": [
+            23,
+            20
+          ],
+          "hat": "chef",
+          "outfit": "chef"
+        }
+      ]
+    },
+    {
+      "build": "4.json",
+      "caption": "Bake it in the oven",
+      "actors": [
+        {
+          "skin": "steve",
+          "path": [
+            [
+              1,
+              31
+            ],
+            [
+              7,
+              28
+            ]
+          ],
+          "action": "wave",
+          "start": 0.0,
+          "y": 1,
+          "face": [
+            15,
+            22
+          ],
+          "hat": "chef",
+          "outfit": "chef"
+        },
+        {
+          "skin": "alex",
+          "path": [
+            [
+              31,
+              18
+            ],
+            [
+              23,
+              29
+            ]
+          ],
+          "action": "carry",
+          "start": 0.4,
+          "y": 1,
+          "face": [
+            16,
+            24
+          ],
+          "hat": "chef",
+          "outfit": "chef",
+          "item": "pizza"
+        }
+      ]
+    }
+  ],
+  "product": {
+    "build": "product.json",
+    "caption": "Pizza is ready!",
+    "actors": [
+      {
+        "skin": "steve",
+        "path": [
+          [
+            0,
+            30
+          ],
+          [
+            5,
+            33
+          ]
+        ],
+        "action": "cheer",
+        "start": 0.0,
+        "y": 0,
+        "face": [
+          20,
+          20
+        ],
+        "hat": "chef",
+        "outfit": "chef"
+      },
+      {
+        "skin": "alex",
+        "path": [
+          [
+            40,
+            30
+          ],
+          [
+            35,
+            33
+          ]
+        ],
+        "action": "cheer",
+        "start": 0.3,
+        "y": 0,
+        "face": [
+          20,
+          20
+        ],
+        "hat": "chef",
+        "outfit": "chef"
+      }
+    ]
+  }
+}
